@@ -11,7 +11,7 @@ pydantic-settings==2.6.1
 pydantic[email]==2.10.3
 
 # Authentication & Security
-PyJWT==2.10.1
+PyJWT>=2.14.0
 pwdlib[argon2]==0.2.1
 argon2-cffi==23.1.0
 
