@@ -274,26 +274,26 @@ jobs:
 
       - name: Container Smoke Test (Health Endpoint & UI Verification)
         run: |
-          echo "🚀 Starting container for live health probe..."
-          docker run -d \
-            --name cams-smoke-check \
-            -p 8000:8000 \
-            -e APP_ENV=testing \
-            -e JWT_SECRET=test_secret_key_at_least_32_characters_long_for_security \
-            -e INITIAL_ADMIN_PASSWORD=TestAdminPassword123! \
-            cams-app:latest
+          echo "📝 Ensuring .env file exists for container stack..."
+          if [ ! -f .env ]; then
+            cp .env.example .env 2>/dev/null || touch .env
+          fi
 
-          sleep 5
+          echo "🚀 Starting CAMS stack with MongoDB for live integration test..."
+          docker compose up -d mongodb api
 
           echo "🔍 Probing live health endpoint..."
-          curl --retry 5 --retry-delay 2 --retry-connrefused -f http://localhost:8000/health/live || (docker logs cams-smoke-check && exit 1)
+          curl --retry 10 --retry-delay 2 --retry-connrefused -f http://localhost:8000/health/live
+
+          echo "🔍 Probing database readiness endpoint..."
+          curl --retry 10 --retry-delay 2 --retry-connrefused -f http://localhost:8000/health/ready
 
           echo "🔍 Probing frontend root UI..."
-          curl -f http://localhost:8000/ || exit 1
+          curl -f http://localhost:8000/
 
-          docker stop cams-smoke-check
-          docker rm cams-smoke-check
-          echo "✅ Container smoke test passed successfully!"
+          echo "🧹 Stopping smoke test stack..."
+          docker compose down
+          echo "✅ Full-stack smoke test passed successfully!"
 
       - name: Run Trivy Vulnerability Gate on Docker Image
         uses: aquasecurity/trivy-action@master

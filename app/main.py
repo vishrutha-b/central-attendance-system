@@ -38,15 +38,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging(settings.log_level)
     logger.info("Starting Central Attendance Management System (env: %s)...", settings.app_env)
 
-    # 1. Connect to MongoDB
-    await connect_to_database()
-
-    # 2. Ensure indexes are created
+    # 1. Connect to MongoDB and initialize indexes
     try:
+        await connect_to_database()
         db = get_database()
         await create_indexes(db)
     except Exception as exc:
-        logger.error("Failed to initialize database indexes: %s", exc)
+        logger.warning(
+            "Database connection deferred or unavailable on startup: %s. "
+            "Readiness probe will report unavailable until connected.",
+            exc,
+        )
 
     yield
 
