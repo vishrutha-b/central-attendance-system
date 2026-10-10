@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI/CD Pipeline & DevSecOps Architecture Documentation — CAMS</title>
+<style>
+  :root {
+    --primary: #0f172a;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --success: #16a34a;
+    --success-light: #f0fdf4;
+    --warning: #d97706;
+    --warning-light: #fffbeb;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --bg-card: #ffffff;
+    --bg-page: #f8fafc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-page);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  }
+  .header-badge {
+    display: inline-block;
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 28px;
+    color: var(--primary);
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 16px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+  }
+  h2 {
+    font-size: 20px;
+    color: var(--primary);
+    margin: 32px 0 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .callout {
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+  .callout-success {
+    background: var(--success-light);
+    border-left-color: var(--success);
+  }
+  .tree-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .tree-node {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    background: #fdfdfd;
+  }
+  .tree-node.root { border-top: 4px solid #3b82f6; }
+  .tree-node.branch-a { border-top: 4px solid #10b981; }
+  .tree-node.branch-b { border-top: 4px solid #ef4444; }
+  .tree-node.branch-c { border-top: 4px solid #8b5cf6; }
+  .tree-node.merge { border-top: 4px solid #f59e0b; }
+  .tree-node.final { border-top: 4px solid #06b6d4; }
+  .node-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .node-tag { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+  .node-desc { font-size: 13px; margin-top: 8px; color: var(--text); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  th {
+    background: #1e293b;
+    color: #ffffff;
+    font-weight: 600;
+  }
+  tr:nth-child(even) { background-color: #f8fafc; }
+  pre {
+    background: #0f172a;
+    color: #f1f5f9;
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-family: Consolas, monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    margin: 12px 0 20px 0;
+  }
+  .stage-box {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    background: #fff;
+  }
+  .stage-box h3 {
+    font-size: 17px;
+    color: var(--primary);
+    margin-bottom: 8px;
+  }
+  .stage-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: #e2e8f0;
+    color: #334155;
+    margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header-badge">DevSecOps & CI/CD Specification</div>
+  <h1>Central Attendance Management System (CAMS)</h1>
+  <div class="subtitle">Complete Automated Continuous Integration & Security Pipeline Reference</div>
+
+  <div class="callout">
+    <strong>Document Purpose:</strong> This technical reference documents every stage, testing tool, and security scanner implemented in the GitHub Actions workflow (<code>.github/workflows/ci.yml</code>).
+  </div>
+
+  <h2>1. Directed Acyclic Graph (DAG) Pipeline Tree</h2>
+  <p>To optimize execution speed and provide transparent feedback, the pipeline runs as an interconnected multi-job tree:</p>
+
+  <div class="tree-grid">
+    <div class="tree-node root">
+      <div class="node-title">1. Root Gatekeeper</div>
+      <div class="node-tag">syntax-and-setup</div>
+      <div class="node-desc">Python compileall checks syntax across all files. Fast-fails early on syntax errors.</div>
+    </div>
+    <div class="tree-node branch-a">
+      <div class="node-title">2. Code Quality</div>
+      <div class="node-tag">code-quality</div>
+      <div class="node-desc">Ruff linter and MyPy static type checks run in parallel.</div>
+    </div>
+    <div class="tree-node branch-b">
+      <div class="node-title">3. Security Scans</div>
+      <div class="node-tag">security-scans</div>
+      <div class="node-desc">Bandit SAST, pip-audit CVE scan, Safety, and Gitleaks secret detection.</div>
+    </div>
+    <div class="tree-node branch-c">
+      <div class="node-title">4. Automated Tests</div>
+      <div class="node-tag">test-suite</div>
+      <div class="node-desc">Spins up MongoDB 7.0 service container and runs Unit & API pytest suites.</div>
+    </div>
+    <div class="tree-node merge">
+      <div class="node-title">5. SonarQube Gate</div>
+      <div class="node-tag">sonarqube</div>
+      <div class="node-desc">Aggregates coverage.xml from tests and evaluates Clean Code Quality Gate.</div>
+    </div>
+    <div class="tree-node final">
+      <div class="node-title">6. Docker Build & Scan</div>
+      <div class="node-tag">docker-build-and-scan</div>
+      <div class="node-desc">Builds Docker container and scans layers using Aqua Security Trivy.</div>
+    </div>
+  </div>
+
+  <h2>2. Deep-Dive Stage Analysis</h2>
+
+  <div class="stage-box">
+    <h3>Stage 1: Syntax & Base Verification <span class="stage-badge">compileall</span></h3>
+    <p><strong>Objective:</strong> Fast-fail the pipeline in seconds if syntax errors exist before spinning up database services.</p>
+    <pre>python -m compileall app/ tests/ scripts/</pre>
+  </div>
+
+  <div class="stage-box">
+    <h3>Stage 2: Code Quality & Type Checking <span class="stage-badge">Ruff</span> <span class="stage-badge">MyPy</span></h3>
+    <p><strong>Objective:</strong> Enforce PEP 8 style standards, import cleanliness, and validate type consistency across FastAPI Pydantic models.</p>
+    <pre>ruff check app/ tests/ scripts/
+mypy --explicit-package-bases --ignore-missing-imports app/</pre>
+  </div>
+
+  <div class="stage-box">
+    <h3>Stage 3: Security Scans <span class="stage-badge">Bandit</span> <span class="stage-badge">pip-audit</span> <span class="stage-badge">Safety</span> <span class="stage-badge">Gitleaks</span></h3>
+    <p><strong>Objective:</strong> Multi-vector security auditing to catch AST vulnerabilities, third-party library CVEs, and secret leaks.</p>
+    <pre>bandit -r app/ -ll -s B104
+pip-audit -r requirements.txt
+safety check -r requirements.txt</pre>
+  </div>
+
+  <div class="stage-box">
+    <h3>Stage 4: Automated Testing & Coverage <span class="stage-badge">Pytest</span> <span class="stage-badge">MongoDB 7.0</span></h3>
+    <p><strong>Objective:</strong> Runs isolated tests against live endpoints, measures code coverage, and archives test artifacts.</p>
+    <pre>pytest tests/unit -v --cov=app --cov-report=xml:coverage.xml
+pytest tests/api -v</pre>
+  </div>
+
+  <div class="stage-box">
+    <h3>Stage 5: SonarQube Analysis <span class="stage-badge">SonarCloud</span> <span class="stage-badge">Quality Gate</span></h3>
+    <p><strong>Objective:</strong> Inspects test coverage, duplicate code, and security hot-spots. Cleanly skips if <code>SONAR_TOKEN</code> is not yet configured.</p>
+    <pre>sonar-scanner (configured via sonar-project.properties)</pre>
+  </div>
+
+  <div class="stage-box">
+    <h3>Stage 6: Docker Container Build & Scan <span class="stage-badge">Docker</span> <span class="stage-badge">Trivy</span></h3>
+    <p><strong>Objective:</strong> Assembles the deployable container image and scans for critical OS layer CVEs before deployment.</p>
+    <pre>docker build -t central-attendance-system:$GITHUB_SHA .
+trivy image --severity CRITICAL,HIGH central-attendance-system:$GITHUB_SHA</pre>
+  </div>
+
+  <h2>3. Developer Pre-Commit Cheatsheet</h2>
+  <div class="callout callout-success">
+    <strong>Local Run:</strong> Run these commands in PowerShell before committing:
+  </div>
+  <pre>python -m compileall app/ tests/ scripts/
+ruff check app/ tests/ scripts/
+bandit -r app/ -ll -s B104
+pytest tests/unit tests/api -v</pre>
+</div>
+</body>
+</html>

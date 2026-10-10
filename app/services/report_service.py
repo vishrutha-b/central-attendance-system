@@ -51,6 +51,7 @@ class ReportService:
         period: str,
         department: str | None = None,
         is_active: bool | None = None,
+        employee_id: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]:
@@ -60,12 +61,17 @@ class ReportService:
         today = date.today()
 
         # Load employees with filters
-        all_employees, total = await self.employee_repo.list_employees(
-            skip=0,
-            limit=10_000,  # load all, we paginate after
-            department=department,
-            is_active=is_active,
-        )
+        if employee_id:
+            emp = await self.employee_repo.find_by_id(employee_id.upper())
+            all_employees = [emp] if emp else []
+            total = len(all_employees)
+        else:
+            all_employees, total = await self.employee_repo.list_employees(
+                skip=0,
+                limit=10_000,  # load all, we paginate after
+                department=department,
+                is_active=is_active,
+            )
 
         # Load company holidays
         holiday_dates = await self.holiday_service.get_holiday_dates(period_start, period_end)

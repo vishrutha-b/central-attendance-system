@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Central Attendance Management System (CAMS) - Enterprise workforce attendance and compliance portal.">
+  <title>CAMS — Central Attendance System</title>
+  
+  <!-- Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       DEDICATED FULL-PAGE AUTHENTICATION GATE (LOGIN SCREEN)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="view-auth-gate" class="auth-gate-wrapper">
+    <div class="auth-gate-card">
+      <div class="auth-brand-block">
+        <div class="auth-brand-icon">C</div>
+        <div>
+          <h1 class="auth-title">CAMS Portal</h1>
+          <p class="auth-subtitle">Central Attendance & Compliance System</p>
+        </div>
+      </div>
+
+      <!-- Segmented Role Selector -->
+      <div class="auth-role-tabs">
+        <button type="button" class="auth-role-tab active" id="auth-tab-admin">
+          <span>🛡️ Administrator</span>
+        </button>
+        <button type="button" class="auth-role-tab" id="auth-tab-employee">
+          <span>👤 Employee</span>
+        </button>
+      </div>
+
+      <!-- Sign In vs Register Mode Switcher -->
+      <div style="display: flex; justify-content: center; gap: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.65rem;">
+        <button type="button" class="auth-mode-link active" id="auth-mode-signin" style="background: none; border: none; font-size: 0.86rem; font-weight: 600; color: var(--primary); cursor: pointer; border-bottom: 2px solid var(--primary); padding-bottom: 4px;">
+          Sign In
+        </button>
+        <button type="button" class="auth-mode-link" id="auth-mode-register" style="background: none; border: none; font-size: 0.86rem; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; padding-bottom: 4px;">
+          Create Account / Set Password
+        </button>
+      </div>
+
+      <!-- Role Helper Description -->
+      <div style="background: var(--bg-subtle); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted);" id="auth-role-description">
+        <strong>Administrator Access:</strong> Enter your admin username and password to log in.
+      </div>
+
+      <!-- Error Alert Box -->
+      <div class="auth-error-box" id="auth-error-message"></div>
+
+      <!-- ── FORM 1: SIGN IN ────────────────────────────────────────────────── -->
+      <form id="auth-login-form" class="auth-form">
+        <div class="form-group">
+          <label class="form-label" for="auth-input-username" id="auth-label-username">
+            <span>Admin Username</span>
+          </label>
+          <input type="text" class="form-control" id="auth-input-username" placeholder="Enter username" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="auth-input-password">
+            <span>Password</span>
+          </label>
+          <input type="password" class="form-control" id="auth-input-password" placeholder="Enter your password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="auth-btn-submit" style="padding: 0.75rem;">
+          Sign In as Administrator →
+        </button>
+
+        <div style="text-align: center; margin-top: 0.25rem;">
+          <a href="#" id="auth-switch-to-register" style="font-size: 0.82rem; color: var(--primary); text-decoration: none;">
+            New user? Create your account & password →
+          </a>
+        </div>
+      </form>
+
+      <!-- ── FORM 2: CREATE ACCOUNT / REGISTER ─────────────────────────────── -->
+      <form id="auth-register-form" class="auth-form" style="display: none;">
+        <!-- Employee specific fields -->
+        <div id="auth-reg-employee-fields" style="display: none; flex-direction: column; gap: 0.85rem;">
+          <div class="form-group">
+            <label class="form-label" for="auth-reg-emp-id">
+              <span>Employee ID</span>
+              <span style="font-size: 0.72rem; color: var(--text-muted);">Optional (auto-assigned if blank)</span>
+            </label>
+            <input type="text" class="form-control" id="auth-reg-emp-id" placeholder="e.g. EMP-101">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="auth-reg-emp-name">Full Name</label>
+            <input type="text" class="form-control" id="auth-reg-emp-name" placeholder="e.g. Rahul Sharma">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="auth-reg-emp-dept">Department</label>
+            <select class="form-control" id="auth-reg-emp-dept">
+              <option value="Engineering">Engineering</option>
+              <option value="Product">Product</option>
+              <option value="Design">Design</option>
+              <option value="Human Resources">Human Resources</option>
+              <option value="Sales">Sales</option>
+              <option value="Operations">Operations</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Admin specific fields -->
+        <div id="auth-reg-admin-fields" style="display: flex; flex-direction: column; gap: 0.85rem;">
+          <div class="form-group">
+            <label class="form-label" for="auth-reg-admin-username">Admin Username</label>
+            <input type="text" class="form-control" id="auth-reg-admin-username" placeholder="Choose admin username">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="auth-reg-admin-name">Full Name (Optional)</label>
+            <input type="text" class="form-control" id="auth-reg-admin-name" placeholder="e.g. Admin Name">
+          </div>
+        </div>
+
+        <!-- Common fields: Email & Password -->
+        <div class="form-group">
+          <label class="form-label" for="auth-reg-email">Work Email</label>
+          <input type="email" class="form-control" id="auth-reg-email" placeholder="name@company.com" required>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="auth-reg-password">Create Password</label>
+            <input type="password" class="form-control" id="auth-reg-password" placeholder="Min 6 chars" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="auth-reg-confirm-password">Confirm Password</label>
+            <input type="password" class="form-control" id="auth-reg-confirm-password" placeholder="Repeat password" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="auth-btn-reg-submit" style="padding: 0.75rem;">
+          Create Administrator Account →
+        </button>
+
+        <div style="text-align: center; margin-top: 0.25rem;">
+          <a href="#" id="auth-switch-to-signin" style="font-size: 0.82rem; color: var(--primary); text-decoration: none;">
+            Already have an account? Sign in →
+          </a>
+        </div>
+      </form>
+
+      <div class="auth-footer">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>End-to-end encrypted • Enterprise security policy enforced</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       AUTHENTICATED APPLICATION SHELL
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="app-shell" style="display: none;">
+
+    <!-- ── Top Clean Navbar ────────────────────────────────────────────────── -->
+    <header class="navbar">
+      <div style="display: flex; align-items: center; gap: 2rem;">
+        <a href="#dashboard" class="nav-brand">
+          <div class="brand-icon">C</div>
+          <div>
+            <span class="brand-title">CAMS</span>
+            <span class="brand-tag" id="brand-role-subtitle">Central Attendance</span>
+          </div>
+        </a>
+
+        <!-- Primary Segmented Tab Navigation -->
+        <nav class="nav-links">
+          <button type="button" class="nav-link active" data-tab="dashboard">Dashboard</button>
+          <button type="button" class="nav-link" data-tab="attendance">Timesheets</button>
+          <button type="button" class="nav-link" data-tab="employees">Directory</button>
+          <button type="button" class="nav-link" data-tab="leave">Leaves & Holidays</button>
+          <button type="button" class="nav-link" data-tab="reports">Reports</button>
+          <button type="button" class="nav-link" data-tab="audit">Audit Logs</button>
+        </nav>
+      </div>
+
+      <div class="nav-right">
+        <!-- Live Health Dot -->
+        <div class="health-status" title="Backend connectivity">
+          <span class="health-dot" id="health-indicator-dot"></span>
+          <span id="health-indicator-text">System Live</span>
+        </div>
+
+        <!-- Theme Switcher -->
+        <button type="button" class="theme-btn" id="theme-toggle-btn" title="Toggle Light / Dark Mode">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+
+        <!-- User Session Pill & Sign Out -->
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div class="user-btn" id="auth-user-pill">
+            <span class="user-avatar-sm" id="auth-user-avatar">A</span>
+            <span id="auth-user-name">Admin (admin)</span>
+          </div>
+          <button type="button" class="btn-signout" id="app-signout-btn" title="Sign out of portal">
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </header>
+
+  <!-- ── Main Workspace ──────────────────────────────────────────────────── -->
+  <main class="main-container">
+
+    <!-- ===================================================================
+         VIEW 1: EXECUTIVE DASHBOARD
+         =================================================================== -->
+    <section class="tab-view active" id="view-dashboard">
+      
+      <!-- Subtle Policy Strip -->
+      <div class="policy-strip">
+        <div class="policy-strip-left">
+          <div class="policy-strip-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+          <div class="policy-strip-text">
+            <strong>Attendance Policy Engine:</strong> Daily requirement is <strong>≥ 5.0 hours</strong>. Exiting before 5.0 hours automatically sends an alert notice to the employee.
+          </div>
+        </div>
+        <div class="policy-pills">
+          <span class="pill-rule">Daily: ≥ 5.0h</span>
+          <span class="pill-rule">Weekly: ≥ 3 days</span>
+          <span class="pill-rule">Weekly: ≥ 15.0h</span>
+        </div>
+      </div>
+
+      <!-- Employee Personal Welcome Banner (Visible only for employees) -->
+      <div id="employee-welcome-banner" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; align-items: center; justify-content: space-between; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div class="brand-icon" style="background: var(--primary); width: 44px; height: 44px; font-size: 1.25rem;" id="emp-banner-avatar">E</div>
+          <div>
+            <h2 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 2px;" id="emp-banner-name">Welcome to Your Portal</h2>
+            <p style="font-size: 0.82rem; color: var(--text-muted);" id="emp-banner-subtitle">
+              Employee ID: <code id="emp-banner-id">EMP-007</code> • Department: <span id="emp-banner-dept">Engineering</span>
+            </p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+          <span class="badge badge-success" style="padding: 6px 12px; font-size: 0.8rem;">Self-Service Active</span>
+        </div>
+      </div>
+
+      <!-- Clean KPI Metric Cards (Admin only) -->
+      <div class="kpi-grid" id="admin-kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Registered Workforce</span>
+          <div class="kpi-number" id="metric-total-employees">0</div>
+          <span class="kpi-footer">Active employees</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Mandatory Daily</span>
+          <div class="kpi-number">5.0h</div>
+          <span class="kpi-footer">Minimum office presence</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Pending Leaves</span>
+          <div class="kpi-number" id="metric-pending-leaves">0</div>
+          <span class="kpi-footer">Awaiting manager review</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Weekly Threshold</span>
+          <div class="kpi-number">15.0h</div>
+          <span class="kpi-footer">3 qualifying in-office days</span>
+        </div>
+      </div>
+
+      <!-- 2-Column Section: Terminal & Workforce Roster -->
+      <div class="section-cols">
+        
+        <!-- Column 1: Attendance Station -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Attendance Punch Station</h3>
+              <span class="card-subtitle">Record daily office clock-in and clock-out</span>
+            </div>
+            <span class="badge badge-success">Live Terminal</span>
+          </div>
+
+          <div class="card-body">
+            <!-- Mode Selector -->
+            <div class="punch-modes">
+              <button type="button" class="punch-mode-btn active" data-mode="entry">Clock In</button>
+              <button type="button" class="punch-mode-btn" data-mode="exit">Clock Out</button>
+              <button type="button" class="punch-mode-btn" data-mode="quick">Quick Record</button>
+            </div>
+
+            <form id="punch-terminal-form" style="display: flex; flex-direction: column; gap: 1rem;">
+              <div class="form-group">
+                <label class="form-label" for="punch-employee-id">
+                  <span>Employee ID</span>
+                  <span style="font-size: 0.72rem; color: var(--text-muted);">e.g. EMP-007</span>
+                </label>
+                <input type="text" class="form-control" id="punch-employee-id" value="EMP-007" placeholder="EMP-007" required>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group" id="punch-entry-group">
+                  <label class="form-label" for="punch-entry-time">
+                    <span>Entry Time</span>
+                    <button type="button" id="use-now-entry" class="preset-chip" style="padding: 1px 6px;">Now</button>
+                  </label>
+                  <input type="text" class="form-control" id="punch-entry-time" value="09:00" placeholder="09:00">
+                </div>
+
+                <div class="form-group" id="punch-exit-group" style="display: none;">
+                  <label class="form-label" for="punch-exit-time">
+                    <span>Exit Time</span>
+                    <button type="button" id="use-now-exit" class="preset-chip" style="padding: 1px 6px;">Now</button>
+                  </label>
+                  <input type="text" class="form-control" id="punch-exit-time" placeholder="12:00">
+                </div>
+              </div>
+
+              <!-- Clean Duration & Compliance Estimator -->
+              <div class="estimator-box">
+                <div class="estimator-top">
+                  <div class="estimator-hours">
+                    <span id="calc-hours-number">0.00</span>
+                    <span>hrs</span>
+                  </div>
+                  <span class="estimator-badge" id="calc-status-badge">Ready</span>
+                </div>
+                <div class="meter-bar">
+                  <div class="meter-fill" id="calc-progress-fill"></div>
+                </div>
+                <div style="font-size: 0.76rem; color: var(--text-muted);" id="calc-notice-text">
+                  Policy rule: ≥ 5.0h required. Exits under 5h send immediate email alert.
+                </div>
+              </div>
+
+              <!-- Quick Test Presets -->
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem;">TEST PRESETS:</div>
+                <div class="presets-row">
+                  <button type="button" class="preset-chip" id="preset-deficit-demo" style="border-color: var(--danger); color: var(--danger);">
+                    Test &lt; 5h Deficit (9:00 → 12:00 = 3h)
+                  </button>
+                  <button type="button" class="preset-chip" id="preset-compliant-demo">
+                    Test Compliant (9:00 → 17:30 = 8.5h)
+                  </button>
+                </div>
+              </div>
+
+              <div style="margin-top: 0.5rem;">
+                <button type="submit" class="btn btn-primary btn-block" id="punch-submit-btn">
+                  Record Clock-In
+                </button>
+              </div>
+              <div id="punch-immutable-notice" style="display: none; font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">
+                🔒 Punches are immutable once submitted. Contact HR for adjustments.
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Column 2A: Workforce Roster (Admin only) -->
+        <div class="card" id="admin-workforce-roster-col">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Workforce Directory</h3>
+              <span class="card-subtitle">Active staff registered in the organization</span>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-open-modal="modal-new-employee">
+              + New Employee
+            </button>
+          </div>
+
+          <div class="card-body">
+            <div class="roster-list" id="live-activity-list">
+              <div class="empty-box">
+                <div class="spinner"></div>
+                <span style="font-size: 0.8rem; margin-top: 0.5rem;">Loading workforce...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 2B: Employee Guidelines & Status (Employee only) -->
+        <div class="card" id="employee-policy-info-col" style="display: none;">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">My Attendance Guidelines</h3>
+              <span class="card-subtitle">Workplace rules & self-service controls</span>
+            </div>
+            <span class="badge badge-success">Policy Active</span>
+          </div>
+
+          <div class="card-body" style="display: flex; flex-direction: column; gap: 0.85rem;">
+            <div style="background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 0.9rem; border: 1px solid var(--border-color);">
+              <div style="font-weight: 600; font-size: 0.86rem; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 6px;">
+                <span>⏱️ Daily Requirement (≥ 5.0h)</span>
+              </div>
+              <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45;">
+                Log at least <strong>5.0 hours</strong> in office each working day. Clocking out before 5.0 hours triggers an automated email deficit alert.
+              </p>
+            </div>
+
+            <div style="background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 0.9rem; border: 1px solid var(--border-color);">
+              <div style="font-weight: 600; font-size: 0.86rem; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 6px;">
+                <span>📅 Weekly Presence (≥ 3 days & ≥ 15h)</span>
+              </div>
+              <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45;">
+                Maintain <strong>3 office days</strong> and <strong>15.0 total hours</strong> per calendar week. Approved leaves count towards compliance.
+              </p>
+            </div>
+
+            <div style="background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 0.9rem; border: 1px solid var(--border-color);">
+              <div style="font-weight: 600; font-size: 0.86rem; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 6px;">
+                <span>🔒 Immutable Timesheet Policy</span>
+              </div>
+              <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45;">
+                Employees can view their full timesheet and compliance report, but cannot alter past punches or leave records. Contact HR for regularization.
+              </p>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem;">
+              <button type="button" class="btn btn-secondary btn-sm" style="flex: 1;" onclick="app.switchView('attendance')">
+                View My Timesheet →
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" style="flex: 1;" onclick="app.switchView('leave')">
+                Apply for Leave →
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VIEW 2: ATTENDANCE TIMESHEET LOGS
+         =================================================================== -->
+    <section class="tab-view" id="view-attendance">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Attendance Timesheet Logs</h2>
+          <p class="page-desc">Complete session records, duration calculations, and policy compliance</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="filter-row" style="width: 100%;">
+            <div class="filter-left">
+              <input type="text" class="form-control" id="att-filter-emp" placeholder="Filter by Employee ID" value="EMP-007" style="max-width: 220px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="app.loadAttendanceView()">Apply Filter</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Employee ID</th>
+                <th>Clock In</th>
+                <th>Clock Out</th>
+                <th>Hours</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="attendance-table-body">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VIEW 3: WORKFORCE DIRECTORY
+         =================================================================== -->
+    <section class="tab-view" id="view-employees">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Workforce Directory</h2>
+          <p class="page-desc">Manage employee accounts, roles, and department assignments</p>
+        </div>
+        <button type="button" class="btn btn-primary" data-open-modal="modal-new-employee">
+          + Onboard Employee
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="filter-row" style="width: 100%;">
+            <div class="filter-left">
+              <input type="text" class="form-control" id="emp-search-input" placeholder="Search by name, ID, or email..." oninput="app.loadEmployeesView()" style="min-width: 260px;">
+              <select class="form-control" id="emp-dept-filter" onchange="app.loadEmployeesView()" style="max-width: 200px;">
+                <option value="">All Departments</option>
+                <option value="Engineering">Engineering</option>
+                <option value="Product">Product</option>
+                <option value="Design">Design</option>
+                <option value="Human Resources">Human Resources</option>
+                <option value="Sales">Sales</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding: 1.5rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;" id="employees-grid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VIEW 4: LEAVE & HOLIDAYS
+         =================================================================== -->
+    <section class="tab-view" id="view-leave">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Leave & Holiday Management</h2>
+          <p class="page-desc">Employee self-service time off requests and company calendar</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary" data-open-modal="modal-holiday">+ Add Holiday</button>
+          <button type="button" class="btn btn-primary" data-open-modal="modal-leave-request">Apply for Leave</button>
+        </div>
+      </div>
+
+      <div class="section-cols">
+        <!-- Leave Requests Queue -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Leave Applications</h3>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Type</th>
+                  <th>Dates</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="leave-table-body">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Official Holidays -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Company Holidays</h3>
+          </div>
+          <div class="card-body" id="holidays-list-container">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VIEW 5: COMPLIANCE & REPORTS
+         =================================================================== -->
+    <section class="tab-view" id="view-reports">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Compliance Reports & Analytics</h2>
+          <p class="page-desc">Deterministic policy evaluation and payroll summary metrics</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary" id="download-csv-btn">Export CSV</button>
+          <button type="button" class="btn btn-primary" data-open-modal="modal-run-audit">Run Weekly Audit</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Days Attended</span>
+          <div class="kpi-number" id="rep-total-days">—</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Total Office Hours</span>
+          <div class="kpi-number" id="rep-total-hours">—</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Daily Average</span>
+          <div class="kpi-number" id="rep-daily-avg">—</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Policy Violations</span>
+          <div class="kpi-number" id="rep-violations" style="color: var(--danger);">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Weekly Compliance Breakdown</h3>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Days Attended</th>
+                <th>Total Hours</th>
+                <th>Daily Avg</th>
+                <th>Policy Compliance</th>
+              </tr>
+            </thead>
+            <tbody id="report-breakdown-body">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VIEW 6: SECURITY AUDIT LOGS
+         =================================================================== -->
+    <section class="tab-view" id="view-audit">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Security & Audit Logs</h2>
+          <p class="page-desc">Immutable records of system actions and compliance audits</p>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="app.loadAuditView()">Refresh Logs</button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Resource</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="audit-table-body">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── MODALS ──────────────────────────────────────────────────────────── -->
+
+  <!-- Modal 1: New Employee (Admin only) -->
+
+  <!-- Modal 2: New Employee -->
+  <div class="modal-backdrop" id="modal-new-employee">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 class="modal-title">Onboard New Employee</h3>
+        <button class="modal-close" data-close-modal>×</button>
+      </div>
+      <form id="new-employee-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="emp-id">Employee ID</label>
+            <input type="text" class="form-control" id="emp-id" placeholder="EMP-007" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="emp-name">Full Name</label>
+            <input type="text" class="form-control" id="emp-name" placeholder="Vishrutha" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="emp-email">Email</label>
+            <input type="email" class="form-control" id="emp-email" placeholder="vishrutha7104@gmail.com" required>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="emp-department">Department</label>
+              <select class="form-control" id="emp-department" required>
+                <option value="Engineering">Engineering</option>
+                <option value="Product">Product</option>
+                <option value="Design">Design</option>
+                <option value="Human Resources">Human Resources</option>
+                <option value="Sales">Sales</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="emp-role">Role</label>
+              <input type="text" class="form-control" id="emp-role" value="Software Engineer">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="emp-password">
+              <span>Account Password</span>
+              <span style="font-size: 0.72rem; color: var(--text-muted);">Set initial employee password (optional)</span>
+            </label>
+            <input type="password" class="form-control" id="emp-password" placeholder="Create password (min 6 chars)">
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 3: Apply for Leave -->
+  <div class="modal-backdrop" id="modal-leave-request">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 class="modal-title">Submit Leave Request</h3>
+        <button class="modal-close" data-close-modal>×</button>
+      </div>
+      <form id="leave-request-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="leave-emp-id">Employee ID</label>
+            <input type="text" class="form-control" id="leave-emp-id" value="EMP-007" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="leave-type">Leave Type</label>
+            <select class="form-control" id="leave-type">
+              <option value="sick">Sick Leave</option>
+              <option value="annual">Annual Leave</option>
+              <option value="casual">Casual Leave</option>
+              <option value="unpaid">Unpaid Leave</option>
+            </select>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="leave-start-date">Start Date</label>
+              <input type="date" class="form-control" id="leave-start-date" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="leave-end-date">End Date</label>
+              <input type="date" class="form-control" id="leave-end-date" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="leave-reason">Reason</label>
+            <input type="text" class="form-control" id="leave-reason" placeholder="Reason for time off" required>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 4: Declare Holiday -->
+  <div class="modal-backdrop" id="modal-holiday">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 class="modal-title">Declare Company Holiday</h3>
+        <button class="modal-close" data-close-modal>×</button>
+      </div>
+      <form id="holiday-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="holiday-name">Holiday Title</label>
+            <input type="text" class="form-control" id="holiday-name" placeholder="Labor Day" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="holiday-date">Date</label>
+            <input type="date" class="form-control" id="holiday-date" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="holiday-desc">Description</label>
+            <input type="text" class="form-control" id="holiday-desc" placeholder="National holiday">
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Holiday</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 5: Regularize Session -->
+  <div class="modal-backdrop" id="modal-regularize">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 class="modal-title">Timesheet Correction (HR)</h3>
+        <button class="modal-close" data-close-modal>×</button>
+      </div>
+      <form id="regularize-form">
+        <input type="hidden" id="reg-attendance-id">
+        <div class="modal-body">
+          <p style="font-size: 0.84rem; color: var(--text-muted);">
+            Employee: <strong id="reg-display-emp">EMP-007</strong>
+          </p>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="reg-entry-time">Corrected Entry</label>
+              <input type="text" class="form-control" id="reg-entry-time" placeholder="09:00">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-exit-time">Corrected Exit</label>
+              <input type="text" class="form-control" id="reg-exit-time" placeholder="17:30">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-reason">Reason for Correction</label>
+            <input type="text" class="form-control" id="reg-reason" placeholder="Badge reader malfunction" required>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 6: Run Weekly Compliance Audit -->
+  <div class="modal-backdrop" id="modal-run-audit">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 class="modal-title">Run Compliance Audit</h3>
+        <button class="modal-close" data-close-modal>×</button>
+      </div>
+      <form id="run-audit-form">
+        <div class="modal-body">
+          <p style="font-size: 0.84rem; color: var(--text-muted);">
+            Evaluates all staff against weekly policy rules (≥ 3 days, ≥ 15h, 5h avg), factoring in approved leaves.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="audit-week-start">Week Start Date (Optional)</label>
+            <input type="date" class="form-control" id="audit-week-start">
+          </div>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 0.84rem; cursor: pointer;">
+            <input type="checkbox" id="audit-include-current" checked>
+            <span>Include current week</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 0.84rem; cursor: pointer;">
+            <input type="checkbox" id="audit-force-resend">
+            <span>Force re-send notification emails</span>
+          </label>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Execute Audit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  </div><!-- /#app-shell -->
+
+  <!-- Toast Stack -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

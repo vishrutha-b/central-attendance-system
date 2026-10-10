@@ -98,6 +98,7 @@ async def get_attendance_report(
     month: int | None = Query(default=None, ge=1, le=12, description="Month for monthly"),
     department: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
+    employee_id: str | None = Query(default=None, description="Filter by employee ID"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     report_service: ReportService = Depends(get_report_service),
@@ -121,12 +122,17 @@ async def get_attendance_report(
             detail=(f"Date range exceeds maximum of {settings.max_report_date_range_days} days."),
         )
 
+    target_emp_id = employee_id
+    if current_admin.get("role") == "employee":
+        target_emp_id = current_admin.get("employee_id") or current_admin.get("admin_id")
+
     return await report_service.generate_report(
         period_start=period_start,
         period_end=period_end,
         period=period,
         department=department,
         is_active=is_active,
+        employee_id=target_emp_id,
         page=page,
         page_size=page_size,
     )
@@ -150,6 +156,7 @@ async def export_attendance_csv(
     month: int | None = Query(default=None, ge=1, le=12),
     department: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
+    employee_id: str | None = Query(default=None),
     report_service: ReportService = Depends(get_report_service),
     current_admin: dict[str, Any] = Depends(get_current_admin),
 ) -> StreamingResponse:
@@ -170,12 +177,17 @@ async def export_attendance_csv(
             detail=f"Date range exceeds maximum of {settings.max_report_date_range_days} days.",
         )
 
+    target_emp_id = employee_id
+    if current_admin.get("role") == "employee":
+        target_emp_id = current_admin.get("employee_id") or current_admin.get("admin_id")
+
     report = await report_service.generate_report(
         period_start=period_start,
         period_end=period_end,
         period=period,
         department=department,
         is_active=is_active,
+        employee_id=target_emp_id,
         page=1,
         page_size=10_000,  # Export all
     )

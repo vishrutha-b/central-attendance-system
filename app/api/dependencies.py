@@ -135,8 +135,9 @@ def get_report_service(
 async def get_current_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     admin_repo: AdminRepository = Depends(get_admin_repo),
+    employee_repo: EmployeeRepository = Depends(get_employee_repo),
 ) -> dict[str, Any]:
-    """Validate JWT and return the current admin user document."""
+    """Validate JWT and return current admin or employee document."""
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -160,13 +161,46 @@ async def get_current_admin(
         ) from None
 
     admin_id = payload.get("sub")
+    role = payload.get("role")
     if not admin_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload.",
         )
 
+    if role == "employee":
+        emp = await employee_repo.find_by_id(admin_id)
+        if emp is None or not emp.get("is_active", True):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Employee account not found or inactive.",
+            )
+        return {
+            "admin_id": emp["employee_id"],
+            "employee_id": emp["employee_id"],
+            "username": emp["employee_id"],
+            "name": emp["name"],
+            "email": emp["email"],
+            "role": "employee",
+            "is_active": emp.get("is_active", True),
+            "department": emp.get("department", ""),
+        }
+
     admin = await admin_repo.find_by_id(admin_id)
+    if admin is None:
+        emp = await employee_repo.find_by_id(admin_id)
+        if emp is not None and emp.get("is_active", True):
+            return {
+                "admin_id": emp["employee_id"],
+                "employee_id": emp["employee_id"],
+                "username": emp["employee_id"],
+                "name": emp["name"],
+                "email": emp["email"],
+                "role": "employee",
+                "is_active": emp.get("is_active", True),
+                "department": emp.get("department", ""),
+            }
+
     if admin is None or not admin.get("is_active"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -179,6 +213,7 @@ async def get_current_admin(
 async def get_optional_current_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     admin_repo: AdminRepository = Depends(get_admin_repo),
+    employee_repo: EmployeeRepository = Depends(get_employee_repo),
 ) -> dict[str, Any] | None:
     """Validate JWT if provided, otherwise return None (allows self-service endpoints)."""
     if credentials is None:
@@ -186,9 +221,42 @@ async def get_optional_current_admin(
     try:
         payload = decode_access_token(credentials.credentials)
         admin_id = payload.get("sub")
+        role = payload.get("role")
         if not admin_id:
             return None
-        return await admin_repo.find_by_id(admin_id)
+
+        if role == "employee":
+            emp = await employee_repo.find_by_id(admin_id)
+            if emp and emp.get("is_active", True):
+                return {
+                    "admin_id": emp["employee_id"],
+                    "employee_id": emp["employee_id"],
+                    "username": emp["employee_id"],
+                    "name": emp["name"],
+                    "email": emp["email"],
+                    "role": "employee",
+                    "is_active": emp.get("is_active", True),
+                    "department": emp.get("department", ""),
+                }
+
+        admin = await admin_repo.find_by_id(admin_id)
+        if admin:
+            return admin
+
+        emp = await employee_repo.find_by_id(admin_id)
+        if emp and emp.get("is_active", True):
+            return {
+                "admin_id": emp["employee_id"],
+                "employee_id": emp["employee_id"],
+                "username": emp["employee_id"],
+                "name": emp["name"],
+                "email": emp["email"],
+                "role": "employee",
+                "is_active": emp.get("is_active", True),
+                "department": emp.get("department", ""),
+            }
+
+        return None
     except Exception:
         return None
 

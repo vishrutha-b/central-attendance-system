@@ -7,7 +7,7 @@ import math
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.dependencies import get_attendance_service, get_current_admin, require_admin
 from app.schemas.attendance import (
@@ -21,6 +21,16 @@ from app.services.attendance_service import AttendanceService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
+
+
+def _check_employee_access(current_admin: dict[str, Any], emp_id: str) -> None:
+    if current_admin.get("role") == "employee":
+        my_id = (current_admin.get("employee_id") or current_admin.get("admin_id") or "").upper()
+        if emp_id.upper() != my_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Employees can only access their own attendance records.",
+            )
 
 
 @router.post(
@@ -37,6 +47,7 @@ async def record_entry(
     service: AttendanceService = Depends(get_attendance_service),
     current_admin: dict[str, Any] = Depends(get_current_admin),
 ) -> dict[str, Any]:
+    _check_employee_access(current_admin, data.employee_id)
     return await service.record_entry(data, actor_id=current_admin["admin_id"])
 
 
@@ -55,6 +66,7 @@ async def record_exit(
     service: AttendanceService = Depends(get_attendance_service),
     current_admin: dict[str, Any] = Depends(get_current_admin),
 ) -> dict[str, Any]:
+    _check_employee_access(current_admin, data.employee_id)
     return await service.record_exit(data, actor_id=current_admin["admin_id"])
 
 
@@ -75,6 +87,7 @@ async def quick_record(
     service: AttendanceService = Depends(get_attendance_service),
     current_admin: dict[str, Any] = Depends(get_current_admin),
 ) -> dict[str, Any]:
+    _check_employee_access(current_admin, data.employee_id)
     return await service.quick_record(data, actor_id=current_admin["admin_id"])
 
 
@@ -89,6 +102,7 @@ async def get_attendance_by_date(
     service: AttendanceService = Depends(get_attendance_service),
     current_admin: dict[str, Any] = Depends(get_current_admin),
 ) -> dict[str, Any]:
+    _check_employee_access(current_admin, employee_id)
     sessions = await service.get_attendance_for_date(employee_id, date.isoformat())
     return {"employee_id": employee_id.upper(), "date": date.isoformat(), "sessions": sessions}
 
@@ -107,6 +121,7 @@ async def get_attendance_history(
     service: AttendanceService = Depends(get_attendance_service),
     current_admin: dict[str, Any] = Depends(get_current_admin),
 ) -> dict[str, Any]:
+    _check_employee_access(current_admin, employee_id)
     items, total = await service.get_attendance_history(
         employee_id=employee_id,
         page=page,

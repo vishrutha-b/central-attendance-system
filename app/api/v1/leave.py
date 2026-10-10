@@ -6,7 +6,7 @@ import logging
 import math
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.dependencies import (
     get_current_admin,
@@ -48,6 +48,15 @@ async def create_leave(
     service: LeaveService = Depends(get_leave_service),
     current_admin: dict[str, Any] | None = Depends(get_optional_current_admin),
 ) -> dict[str, Any]:
+    if current_admin and current_admin.get("role") == "employee":
+        user_emp_id = (
+            current_admin.get("employee_id") or current_admin.get("admin_id") or ""
+        ).upper()
+        if data.employee_id.upper() != user_emp_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Employees can only submit leave requests for their own account.",
+            )
     actor_id = current_admin["admin_id"] if current_admin else data.employee_id
     return await service.create_leave_request(data, actor_id=actor_id)
 
@@ -68,6 +77,10 @@ async def list_leave(
     service: LeaveService = Depends(get_leave_service),
     current_admin: dict[str, Any] | None = Depends(get_optional_current_admin),
 ) -> dict[str, Any]:
+    if current_admin and current_admin.get("role") == "employee":
+        user_emp_id = current_admin.get("employee_id") or current_admin.get("admin_id")
+        employee_id = user_emp_id
+
     items, total = await service.list_leave_requests(
         page=page, page_size=page_size, employee_id=employee_id, status=status
     )

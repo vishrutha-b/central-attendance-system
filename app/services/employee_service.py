@@ -8,6 +8,7 @@ from typing import Any
 
 from app.repositories.employee_repo import EmployeeRepository
 from app.schemas.employee import EmployeeCreate, EmployeeListParams, EmployeeUpdate
+from app.security.password import hash_password
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class EmployeeService:
             emp_id = await self.repo.next_employee_id()
 
         now = datetime.now(tz=UTC)
+        hashed_pwd = hash_password(data.password) if data.password else None
         doc = {
             "employee_id": emp_id,
             "name": data.name,
@@ -29,6 +31,7 @@ class EmployeeService:
             "department": data.department,
             "role": data.role,
             "is_active": True,
+            "hashed_password": hashed_pwd,
             "created_at": now,
             "updated_at": now,
         }

@@ -12,11 +12,13 @@ import time
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.health import router as health_router
 from app.api.v1.router import router as api_v1_router
@@ -139,14 +141,28 @@ def create_app() -> FastAPI:
             },
         )
 
-    # ── Root & Health Routes ──────────────────────────────────────────────────────
+    # ── Root & Static Dashboard Routes ──────────────────────────────────────────
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+        @app.get("/dashboard", include_in_schema=False)
+        @app.get("/app", include_in_schema=False)
+        async def dashboard() -> FileResponse:
+            return FileResponse(str(static_dir / "index.html"))
+
     @app.get("/", tags=["Root"])
-    async def root() -> dict[str, str]:
+    async def root(request: Request):
+        accept = request.headers.get("accept", "")
+        # Browser navigation gets the executive frontend directly
+        if "text/html" in accept and static_dir.exists():
+            return FileResponse(str(static_dir / "index.html"))
         return {
             "app": settings.app_name,
             "version": "1.0.0",
             "environment": settings.app_env,
             "docs": "/docs",
+            "dashboard": "/dashboard",
         }
 
     # Mount health checks under both /health and /api/v1/health

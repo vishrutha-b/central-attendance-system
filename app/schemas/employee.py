@@ -24,6 +24,7 @@ class EmployeeCreate(CAMSBaseModel):
     email: EmailStr
     department: Annotated[str, Field(min_length=1, max_length=100)]
     role: Annotated[str, Field(min_length=1, max_length=100)] = "Employee"
+    password: Annotated[str, Field(min_length=6, max_length=128)] | None = None
 
     @field_validator("employee_id")
     @classmethod

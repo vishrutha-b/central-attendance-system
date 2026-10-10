@@ -29,12 +29,31 @@ class AdminResponse(CAMSBaseModel):
     email: str
     role: AdminRole
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    name: str | None = None
+    employee_id: str | None = None
+    department: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class AdminCreate(CAMSBaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: str
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=6)
     role: AdminRole = "admin"
+
+
+class AdminRegisterRequest(CAMSBaseModel):
+    username: str = Field(min_length=3, max_length=50)
+    email: str = Field(min_length=5, max_length=150)
+    password: str = Field(min_length=6, max_length=128)
+    name: str | None = None
+
+
+class EmployeeRegisterRequest(CAMSBaseModel):
+    employee_id: str | None = None
+    name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=5, max_length=150)
+    department: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=6, max_length=128)
+
