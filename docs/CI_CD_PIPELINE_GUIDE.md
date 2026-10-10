@@ -484,13 +484,17 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_ORG: ${{ secrets.SONAR_ORGANIZATION }}
         run: |
           if [ -n "$SONAR_TOKEN" ] && [ -n "$SONAR_HOST_URL" ]; then
             echo "run_sonar=true" >> "$GITHUB_OUTPUT"
             echo "host_url=$SONAR_HOST_URL" >> "$GITHUB_OUTPUT"
+            echo "extra_args=" >> "$GITHUB_OUTPUT"
           elif [ -n "$SONAR_TOKEN" ]; then
             echo "run_sonar=true" >> "$GITHUB_OUTPUT"
             echo "host_url=https://sonarcloud.io" >> "$GITHUB_OUTPUT"
+            ORG="${SONAR_ORG:-${{ github.repository_owner }}}"
+            echo "extra_args=-Dsonar.organization=$ORG" >> "$GITHUB_OUTPUT"
           else
             echo "run_sonar=false" >> "$GITHUB_OUTPUT"
             echo "ℹ️ Notice: SONAR_TOKEN secret is not configured in repository secrets. Skipping scan."
@@ -505,6 +509,7 @@ jobs:
         with:
           args: >
             -Dsonar.qualitygate.wait=true
+            ${{ steps.check_sonar.outputs.extra_args }}
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 6. DOCKER: HADOLINT, MULTI-TIER BUILD, SMOKE TEST & TRIVY SECURITY GATE
