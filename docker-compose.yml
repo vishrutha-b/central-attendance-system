@@ -19,6 +19,7 @@ services:
       - cams_network
 
   api:
+    image: cams-app:latest
     build:
       context: .
       dockerfile: Dockerfile
