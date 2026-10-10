@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAMS — 60-Minute Master Presentation & Technical Demo Script</title>
+<style>
+  :root {
+    --primary: #0f172a;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --success: #16a34a;
+    --success-light: #f0fdf4;
+    --warning: #f59e0b;
+    --warning-light: #fffbeb;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f8fafc;
+    color: var(--text);
+    line-height: 1.6;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 950px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .header {
+    background: var(--primary);
+    color: #ffffff;
+    padding: 40px;
+    border-bottom: 4px solid var(--accent);
+  }
+  .badge-tag {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    color: #93c5fd;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  .header h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.5px; }
+  .header p { color: #94a3b8; font-size: 15px; }
+  .content { padding: 40px; }
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--primary);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 8px;
+    margin: 40px 0 16px 0;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 { font-size: 16px; font-weight: 700; color: var(--primary); margin: 24px 0 10px 0; }
+  .card-speech {
+    background: var(--success-light);
+    border-left: 4px solid var(--success);
+    padding: 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 18px 0;
+    font-size: 14px;
+    font-style: italic;
+    color: #14532d;
+    line-height: 1.7;
+  }
+  .card-speech-title {
+    font-style: normal;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #166534;
+    margin-bottom: 10px;
+  }
+  .card-action {
+    background: var(--warning-light);
+    border-left: 4px solid var(--warning);
+    padding: 12px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+    font-size: 13.5px;
+    color: #78350f;
+    font-weight: 600;
+  }
+  .time-badge {
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-right: 8px;
+  }
+  ul, ol { padding-left: 22px; margin-bottom: 16px; }
+  li { margin-bottom: 6px; font-size: 14px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px 0;
+    font-size: 13px;
+  }
+  th {
+    background: var(--primary);
+    color: #ffffff;
+    text-align: left;
+    padding: 11px 14px;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) { background: #f8fafc; }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+  code { font-family: Consolas, monospace; }
+  @media print {
+    body { padding: 0; background: #fff; }
+    .container { box-shadow: none; border: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="badge-tag">60-Minute Master Edition</div>
+    <h1>Central Attendance Management System (CAMS)</h1>
+    <p>Complete Technical Presentation, Architecture Review & Live Product Demo Guide</p>
+  </div>
+  <div class="content">
+
+    <h2>Master Agenda & Timeline (60 Minutes)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Segment</th>
+          <th>Time Allocation</th>
+          <th>Topic</th>
+          <th>Focus Area</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Module 1</strong></td>
+          <td><span class="time-badge">00:00 – 08:00</span>(8 mins)</td>
+          <td>Executive Introduction & Problem</td>
+          <td>Hybrid policy challenges, 3 days/15 hrs/5 hrs rule, real-time vs monthly audits.</td>
+        </tr>
+        <tr>
+          <td><strong>Module 2</strong></td>
+          <td><span class="time-badge">08:00 – 18:00</span>(10 mins)</td>
+          <td>System Architecture & Tech Choices</td>
+          <td>FastAPI + Python 3.12, PyMongo Async, MongoDB collections, indexing strategy.</td>
+        </tr>
+        <tr>
+          <td><strong>Module 3</strong></td>
+          <td><span class="time-badge">18:00 – 28:00</span>(10 mins)</td>
+          <td>Codebase Deep Dive & Clean Architecture</td>
+          <td>Lifespan, IoC & DI, Pydantic validators, duration math, leave scaling algorithm.</td>
+        </tr>
+        <tr>
+          <td><strong>Module 4</strong></td>
+          <td><span class="time-badge">28:00 – 36:00</span>(8 mins)</td>
+          <td>Enterprise Email Engine & SMTP</td>
+          <td>Console vs SMTP, Google App Passwords, STARTTLS port 587, HTML templates.</td>
+        </tr>
+        <tr>
+          <td><strong>Module 5</strong></td>
+          <td><span class="time-badge">36:00 – 48:00</span>(12 mins)</td>
+          <td>Live Hands-On Interactive Demo</td>
+          <td>Admin auth, Employee onboarding, Instant Exit Email (&lt;5h), Leave workflows, Audit.</td>
+        </tr>
+        <tr>
+          <td><strong>Module 6</strong></td>
+          <td><span class="time-badge">48:00 – 54:00</span>(6 mins)</td>
+          <td>Testing, Code Quality & Reliability</td>
+          <td>39 automated async tests, Ruff linting, deduplication mechanisms, soft-deletes.</td>
+        </tr>
+        <tr>
+          <td><strong>Module 7</strong></td>
+          <td><span class="time-badge">54:00 – 60:00</span>(6 mins)</td>
+          <td>Q&A, Scalability & Production Roadmap</td>
+          <td>IoT turnstile integration, horizontal scaling, Celery/Redis queues, GDPR compliance.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Pre-Demo Checklist (10 Minutes Prior)</h2>
+    <ul>
+      <li><strong>MongoDB Running</strong>: Verify <code>mongodb://localhost:27017</code> is active.</li>
+      <li><strong>FastAPI Running</strong>: <code>uvicorn app.main:app --reload --host 0.0.0.0 --port 8000</code></li>
+      <li><strong>Browser Tabs Ready</strong>:
+        <ol>
+          <li><code>http://localhost:8000/docs</code> (Swagger UI)</li>
+          <li>Gmail Inbox (<code>vishrutha7104@gmail.com</code>) to show live email landing</li>
+          <li>VS Code with project folder expanded</li>
+        </ol>
+      </li>
+    </ul>
+
+    <h2>Module 1: Executive Introduction & Business Problem (00:00 – 08:00)</h2>
+    <div class="card-speech">
+      <div class="card-speech-title">🗣️ Speaker Script — Word-for-Word:</div>
+      "Good morning / afternoon everyone. Welcome to today’s technical deep-dive and live demonstration of the Central Attendance Management System (CAMS).<br><br>
+      Over the next 60 minutes, we will walk through the business challenges modern enterprises face with hybrid attendance, review our architectural decisions, inspect the underlying codebase, configure real enterprise SMTP, run a live end-to-end demonstration with real email alerts, and explore our automated test suite and production scalability roadmap.<br><br>
+      <strong>The Core Business Problem:</strong><br>
+      In today’s corporate environment, companies worldwide have transitioned to hybrid work models. At our organization, leadership established a clear, unambiguous office attendance policy:<br>
+      1. Every employee must attend the office at least <strong>3 days per week</strong>.<br>
+      2. Every employee must accumulate a minimum of <strong>15 hours per week</strong>.<br>
+      3. Across attended days, employees must maintain a daily presence of at least <strong>5.0 hours per day</strong>.<br><br>
+      <strong>Why Traditional Systems Fail:</strong><br>
+      Most legacy HR systems and biometric integrations operate on a <strong>delayed monthly batch cycle</strong>. At the end of the month, an administrator pulls a CSV export, runs spreadsheet macros, and flags employees who missed their quota. By then, it is 30 days too late. The employee had no timely feedback, managers couldn't intervene, and payroll disputes become inevitable.<br><br>
+      <strong>How CAMS Solves This:</strong><br>
+      CAMS introduces <strong>real-time, event-driven policy enforcement</strong>:<br>
+      • <strong>Instant Exit Alerts</strong>: When an employee clocks in at 9:00 AM and exits at 12:00 PM—having completed only 3.0 hours instead of the mandatory 5.0 hours—our backend detects this shortfall <strong>the exact second they clock out</strong>. The system immediately dispatches an official corporate policy alert to that employee’s inbox.<br>
+      • <strong>Weekly Deterministic Audits</strong>: At week close, a scheduler audits the 3 days / 15 hours requirement.<br>
+      • <strong>Smart Leave & Holiday Scaling</strong>: If an employee takes an approved leave or on official holidays, the weekly quota is dynamically scaled down (e.g., from 3 days / 15 hrs to 2 days / 9 hrs), preventing false penalties."
+    </div>
+
+    <h2>Module 2: System Architecture & Technology Choices (08:00 – 18:00)</h2>
+    <div class="card-speech">
+      <div class="card-speech-title">🗣️ Speaker Script:</div>
+      "When designing CAMS, our guiding engineering principles were high concurrency, sub-millisecond response times, zero blocking I/O, and strict type safety.<br><br>
+      <strong>1. Python 3.12 + FastAPI:</strong><br>
+      FastAPI provides Starlette's asynchronous execution, Pydantic v2's ultra-fast serialization, and automatic Swagger documentation.<br><br>
+      <strong>2. Why PyMongo Async (AsyncMongoClient)?</strong><br>
+      Motor has known deprecation warnings on Python 3.11+ runtimes and relies on wrapping the synchronous driver. In CAMS, we use the official native <code>AsyncMongoClient</code> from PyMongo Async for native event loop integration and zero ORM overhead.<br><br>
+      <strong>3. The 7 MongoDB Collections:</strong><br>
+      • <code>employees</code>: Workforce master records<br>
+      • <code>attendance</code>: Work session records (entry, exit, duration)<br>
+      • <code>leave_requests</code>: Leave applications and review states<br>
+      • <code>holidays</code>: Official corporate holiday registry<br>
+      • <code>notification_logs</code>: Immutable email audit trail and deduplication<br>
+      • <code>audit_logs</code>: Administrative security trail<br>
+      • <code>admin_users</code>: Argon2-hashed administrative credentials<br><br>
+      <strong>4. Compound Indexing Strategy:</strong><br>
+      In <code>indexes.py</code>, we build compound indexes on attendance <code>(employee_id, date)</code> and <code>(employee_id, exit_time)</code>, plus unique indexes on employee IDs and emails, guaranteeing sub-millisecond query performance across millions of rows."
+    </div>
+
+    <h2>Module 3: Codebase Deep Dive & Clean Architecture (18:00 – 28:00)</h2>
+    <div class="card-action">🖥️ Action: Show the VS Code folder tree: app/main.py, app/api/dependencies.py, app/schemas/attendance.py, app/services/attendance_service.py, app/services/policy_service.py.</div>
+    <div class="card-speech">
+      <div class="card-speech-title">🗣️ Speaker Script — Technical Mastery Deep Dive:</div>
+      "Now, let us examine the engineering heart of CAMS. The repository strictly implements Clean 3-Tier Enterprise Architecture: separating Presentation (Routers), Business Logic (Services), and Data Access (Repositories), tied together by Dependency Injection and strict Pydantic v2 schemas.<br><br>
+      <strong>1. Application Lifecycle & Lifespan Context Manager (app/main.py):</strong><br>
+      Rather than deprecated startup/shutdown events, we implemented Python 3.12's <code>asynccontextmanager</code> lifespan handler. It connects to the MongoDB connection pool and builds compound indexes idempotently before any HTTP requests are accepted, and flushes sockets cleanly upon shutdown without dropping active queries.<br><br>
+      <strong>2. Inversion of Control & Dependency Injection (app/api/dependencies.py):</strong><br>
+      Our routers never instantiate repositories directly. We use FastAPI's <code>Depends()</code> to inject AttendanceRepository, EmployeeRepository, and NotificationService. We engineered dual-access dependencies: <code>require_admin()</code> strictly protects management routes, while <code>get_optional_current_admin()</code> allows employees to submit self-service leave requests freely.<br><br>
+      <strong>3. Pydantic v2 Schema Modeling & Flexible Time Parsing (app/schemas/attendance.py):</strong><br>
+      We built custom <code>@field_validator('entry_time', mode='before')</code> parsers. It seamlessly accepts simple 24-hour time strings ('09:00', '12:30') from Swagger/mobile apps as well as full ISO-8601 strings from biometric hardware, dynamically normalizing them into timezone-aware UTC datetime objects.<br><br>
+      <strong>4. Attendance Calculation Engine & Instant Violation Trigger (app/services/attendance_service.py):</strong><br>
+      • Prevents double clock-in by querying open sessions (exit_time = None) and raising 409 Conflict.<br>
+      • Computes exact duration: <code>duration = round((exit_time - entry_time).total_seconds() / 3600, 2)</code>.<br>
+      • Aggregates multiple daily sessions for employees who leave for lunch.<br>
+      • <strong>THE INSTANT TRIGGER:</strong> Inside <code>record_exit()</code>, if total daily hours &lt; 5.0, it immediately calls <code>notification_service.send_daily_violation_email()</code>. No cron delay—the alert email lands the exact second they exit.<br><br>
+      <strong>5. Deterministic Policy Engine & Dynamic Leave Scaling (app/services/policy_service.py):</strong><br>
+      Audits the 3 days / 15 hrs / 5 hrs rules. When an employee takes approved leaves or on holidays, the algorithm calculates net working days: <code>net_days = 5 - (leaves + holidays)</code>. It proportionally scales down required days using ceiling math (<code>ceil(3 * net_days / 5)</code>) and hours (<code>round(15 * net_days / 5, 2)</code>), mathematically guaranteeing zero false penalties.<br><br>
+      <strong>6. Direct PyMongo Async Operations & Atomic Updates (app/repositories/):</strong><br>
+      Executes raw async queries using atomic MongoDB <code>$set</code> operators for single-document transactional integrity, resolving in sub-millisecond time via compound B-tree indexes.<br><br>
+      <strong>7. Enterprise Security & Argon2id Hashing (app/security/):</strong><br>
+      Uses Argon2id via <code>pwdlib</code>—the OWASP recommended memory-hard hashing algorithm resistant to GPU/ASIC attacks, paired with HMAC-SHA256 signed JWT tokens and immutable audit logs."
+    </div>
+
+    <h2>Module 4: Enterprise Email Engine & SMTP Setup (28:00 – 36:00)</h2>
+    <div class="card-speech">
+      <div class="card-speech-title">🗣️ Speaker Script:</div>
+      "In <code>.env</code>, we support two modes: <code>EMAIL_DELIVERY_MODE=console</code> for local development, and <code>EMAIL_DELIVERY_MODE=smtp</code> for production delivery.<br><br>
+      <strong>How Google App Passwords Work:</strong><br>
+      1. We point to <code>smtp.gmail.com</code> on Port 587 with STARTTLS encryption.<br>
+      2. Google blocks basic password authentication for third-party apps.<br>
+      3. We enable 2-Step Verification and generate a dedicated 16-character Google App Password for 'CAMS Attendance'.<br>
+      4. This provides TLS transport encryption without exposing personal passwords.<br><br>
+      <strong>Multipart MIME Design:</strong><br>
+      Emails are delivered via <code>MIMEMultipart('alternative')</code>, attaching both rich responsive HTML (with corporate headers, status badges, and deficit metrics) and a clean plain text fallback."
+    </div>
+
+    <h2>Module 5: Live Hands-On Interactive Demonstration (36:00 – 48:00)</h2>
+    <div class="card-action">🖥️ Action: Switch to Swagger UI at http://localhost:8000/docs with Gmail open in side tab.</div>
+
+    <h3>Step 1: Admin Authentication</h3>
+    <p>Execute <code>POST /api/v1/auth/login</code> with <code>admin</code> / <code>Admin@123456</code>. Copy token and authorize Swagger.</p>
+
+    <h3>Step 2: Employee Profile Check</h3>
+    <p>Execute <code>GET /api/v1/employees/EMP-007</code>. Show active employee Vishrutha (<code>vishrutha7104@gmail.com</code>).</p>
+
+    <h3>Step 3: THE SHOWSTOPPER — Login at 9:00 AM, Exit at 12:00 PM (&lt; 5 Hours)</h3>
+    <ol>
+      <li>Clock-in: <code>POST /api/v1/attendance/entry</code> with <code>entry_time='09:00'</code>. Show session recorded as incomplete.</li>
+      <li>Clock-out: <code>POST /api/v1/attendance/exit</code> with <code>exit_time='12:00'</code>.</li>
+      <li>Highlight JSON output: <code>total_hours: 3.0</code>, policy alert triggered.</li>
+      <li><strong>Switch live to Gmail Inbox</strong>: Show the arriving email with corporate branding, 3.0h completed, 5.0h required, and 2.0h deficit badge!</li>
+    </ol>
+
+    <h3>Step 4: Self-Service Leave & Dynamic Threshold Scaling</h3>
+    <ol>
+      <li>Submit leave via <code>POST /api/v1/leave</code> (no admin token required).</li>
+      <li>Approve leave via <code>PATCH /api/v1/leave/{id}/approve</code>.</li>
+      <li>Explain that approved leave days dynamically lower required weekly days & hours, protecting excused staff.</li>
+    </ol>
+
+    <h3>Step 5: On-Demand Weekly Audit & CSV Export</h3>
+    <ol>
+      <li>Execute <code>POST /api/v1/admin/monitoring/run</code> with <code>include_current_week: true</code>.</li>
+      <li>Download spreadsheet via <code>GET /api/v1/reports/attendance/export.csv</code>.</li>
+    </ol>
+
+    <h2>Module 6: Testing, Code Quality & Reliability (48:00 – 54:00)</h2>
+    <div class="card-speech">
+      <div class="card-speech-title">🗣️ Speaker Script:</div>
+      "Enterprise systems require verified reliability.<br><br>
+      • <strong>Automated Test Suite (pytest -v)</strong>: 39 automated asynchronous tests running in ~1.2s with 100% pass rate.<br>
+      • <strong>Static Code Analysis (ruff check app tests)</strong>: 0 errors across the entire codebase.<br>
+      • <strong>Idempotent Deduplication</strong>: Every email notification generates a unique deduplication key in <code>notification_logs</code>, guaranteeing no duplicate emails."
+    </div>
+
+    <h2>Module 7: Q&A, Scalability & Production Roadmap (54:00 – 60:00)</h2>
+    <div class="card-speech">
+      <div class="card-speech-title">🗣️ Speaker Script:</div>
+      "To wrap up before open Q&A, here is how CAMS scales in an enterprise:<br>
+      • Physical IoT Turnstile Integration via dedicated machine API keys.<br>
+      • Horizontal Scaling behind NGINX / AWS ALB with Redis + Celery worker pools.<br>
+      • MongoDB Sharding on <code>(employee_id, date)</code> partition keys.<br><br>
+      Thank you! I am now delighted to take your questions."
+    </div>
+
+    <h2>Master Q&A Cheatsheet</h2>
+    <table>
+      <thead>
+        <tr><th>Question</th><th>Winning Senior Technical Answer</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Why PyMongo Async over Motor?</strong></td>
+          <td>Motor wraps sync drivers in threadpools and has deprecation issues in modern Python. PyMongo Async (<code>AsyncMongoClient</code>) provides native event loop integration and sub-millisecond query execution without ORM overhead.</td>
+        </tr>
+        <tr>
+          <td><strong>How are multiple punches handled?</strong></td>
+          <td>CAMS sums all completed sessions on that date. As long as cumulative active hours reach 5.0 hours, the employee is fully compliant.</td>
+        </tr>
+        <tr>
+          <td><strong>What if an employee forgets to clock out?</strong></td>
+          <td>Open sessions remain incomplete. HR administrators can regularize the session via <code>PATCH /attendance/session/{id}</code>, with all changes recorded in <code>audit_logs</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>How does the leave system prevent fraud?</strong></td>
+          <td><code>leave_repo</code> executes an overlap query checking date ranges against existing requests. Any collision immediately returns 409 Conflict.</td>
+        </tr>
+      </tbody>
+    </table>
+
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Central Attendance Management System (CAMS) — Project Documentation</title>
+<style>
+  :root {
+    --primary: #0f172a;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --bg-card: #ffffff;
+    --bg-page: #f8fafc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-page);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: var(--bg-card);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .header {
+    background: var(--primary);
+    color: #ffffff;
+    padding: 36px 40px;
+    border-bottom: 4px solid var(--accent);
+  }
+  .header-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    color: #93c5fd;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  .header h1 {
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    color: #94a3b8;
+    font-size: 14px;
+  }
+  .content { padding: 40px; }
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--primary);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 8px;
+    margin: 36px 0 16px 0;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 20px 0 10px 0;
+  }
+  p, li { font-size: 14px; color: var(--text); }
+  ul { padding-left: 20px; margin-bottom: 16px; }
+  li { margin-bottom: 6px; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-danger { background: #fee2e2; color: #b91c1c; }
+  .badge-success { background: #dcfce7; color: #15803d; }
+  .badge-info { background: #e0f2fe; color: #0369a1; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px 0;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  th {
+    background-color: #f1f5f9;
+    color: var(--primary);
+    font-weight: 700;
+  }
+  tr:nth-child(even) td { background-color: #f8fafc; }
+  .card {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin: 16px 0;
+  }
+  .card-alert {
+    background: var(--danger-light);
+    border-left: 4px solid var(--danger);
+    border-radius: 0 8px 8px 0;
+  }
+  .card-info {
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    overflow-x: auto;
+    margin: 12px 0 20px 0;
+  }
+  code {
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+  }
+  .footer {
+    background: #f8fafc;
+    border-top: 1px solid var(--border);
+    padding: 24px 40px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  @media print {
+    body { padding: 0; background: #ffffff; }
+    .container { box-shadow: none; border: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="header-badge">Enterprise Documentation</div>
+    <h1>Central Attendance Management System (CAMS)</h1>
+    <p>Complete Operational Specification, Architectural Guide & User Manual</p>
+  </div>
+
+  <div class="content">
+
+    <h2>1. Executive Summary & Objective</h2>
+    <p>
+      The <strong>Central Attendance Management System (CAMS)</strong> is an automated backend service designed to record employee working hours, enforce corporate presence policies, manage leaves, and provide instant alert dispatching.
+    </p>
+    <div class="card card-info">
+      <strong>Core Capabilities:</strong>
+      <ul>
+        <li><strong>Deterministic Policy Rules</strong>: Clear math-based thresholds without ambiguity.</li>
+        <li><strong>Instant Daily Alert (< 5 hrs)</strong>: Employees who clock out before completing 5 hours receive an immediate automated email alert upon exit.</li>
+        <li><strong>Weekly WFH & Office Enforcement</strong>: Minimum 3 days/week, minimum 15 hours/week, and 5 hours/day average.</li>
+        <li><strong>Self-Service Leave Protection</strong>: Approved leaves excuse employees from attendance requirements, preventing violation notices.</li>
+      </ul>
+    </div>
+
+    <h2>2. Attendance Policy Specification</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Policy Requirement</th>
+          <th>Standard Threshold</th>
+          <th>Evaluation Frequency</th>
+          <th>Non-Compliance Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Mandatory Daily Hours</strong></td>
+          <td><span class="badge badge-info">≥ 5.0 Hours/Day</span></td>
+          <td>Immediate (On Exit)</td>
+          <td><span class="badge badge-danger">Instant Email Alert</span> to Employee</td>
+        </tr>
+        <tr>
+          <td><strong>Mandatory Weekly Days</strong></td>
+          <td><span class="badge badge-info">≥ 3 Days/Week</span></td>
+          <td>Weekly Audit Close</td>
+          <td>Flagged in Weekly Notice</td>
+        </tr>
+        <tr>
+          <td><strong>Mandatory Weekly Hours</strong></td>
+          <td><span class="badge badge-info">≥ 15.0 Hours/Week</span></td>
+          <td>Weekly Audit Close</td>
+          <td>Flagged in Weekly Notice</td>
+        </tr>
+        <tr>
+          <td><strong>Daily Average Hours</strong></td>
+          <td><span class="badge badge-info">≥ 5.0 Hours/Day</span></td>
+          <td>Weekly Audit Close</td>
+          <td>Flagged in Weekly Notice</td>
+        </tr>
+        <tr>
+          <td><strong>Approved Leave Days</strong></td>
+          <td>Excused</td>
+          <td>Proportional Deduction</td>
+          <td><span class="badge badge-success">No Penalty</span> (Thresholds Reduced)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. Complete File-by-File Directory Guide</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Directory / File</th>
+          <th>Layer</th>
+          <th>Responsibilities & Functions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>app/main.py</code></td>
+          <td>Entrypoint</td>
+          <td>Initializes FastAPI, sets up CORS, manages DB connection lifespans, and registers routers.</td>
+        </tr>
+        <tr>
+          <td><code>app/config.py</code></td>
+          <td>Configuration</td>
+          <td>Loads and validates environment variables from <code>.env</code> using Pydantic Settings.</td>
+        </tr>
+        <tr>
+          <td><code>app/api/dependencies.py</code></td>
+          <td>DI & Security</td>
+          <td>Injects repositories, services, and validates JWT Bearer tokens and role access.</td>
+        </tr>
+        <tr>
+          <td><code>app/api/v1/attendance.py</code></td>
+          <td>API Route</td>
+          <td>Endpoints for <code>/entry</code>, <code>/exit</code>, <code>/quick-record</code>, and session history.</td>
+        </tr>
+        <tr>
+          <td><code>app/api/v1/leave.py</code></td>
+          <td>API Route</td>
+          <td>Self-service leave requests (<code>POST /leave</code>) and manager approval (<code>PATCH /leave/{id}/approve</code>).</td>
+        </tr>
+        <tr>
+          <td><code>app/api/v1/employees.py</code></td>
+          <td>API Route</td>
+          <td>Employee workforce CRUD (create, search, department filter, soft delete).</td>
+        </tr>
+        <tr>
+          <td><code>app/api/v1/admin.py</code></td>
+          <td>API Route</td>
+          <td>Admin user accounts, audit trails, and on-demand monitoring execution (<code>/monitoring/run</code>).</td>
+        </tr>
+        <tr>
+          <td><code>app/api/v1/reports.py</code></td>
+          <td>API Route</td>
+          <td>Unified attendance reporting (daily, weekly, monthly) and sanitized CSV downloads.</td>
+        </tr>
+        <tr>
+          <td><code>app/services/attendance_service.py</code></td>
+          <td>Service</td>
+          <td>Session calculation, sequence validation, and <strong>instant daily email trigger on &lt; 5 hours</strong>.</td>
+        </tr>
+        <tr>
+          <td><code>app/services/notification_service.py</code></td>
+          <td>Service</td>
+          <td>Builds and sends executive multipart HTML/plaintext emails via Gmail SMTP or console logging.</td>
+        </tr>
+        <tr>
+          <td><code>app/services/policy_service.py</code></td>
+          <td>Service</td>
+          <td>Deterministic policy engine: evaluates 3-day, 15-hr, and 5-hr rules, factoring in approved leaves.</td>
+        </tr>
+        <tr>
+          <td><code>app/templates/daily_violation.html</code></td>
+          <td>Template</td>
+          <td>Corporate HTML email template sent when an employee exits before 5.0 hours.</td>
+        </tr>
+        <tr>
+          <td><code>app/templates/weekly_violation.html</code></td>
+          <td>Template</td>
+          <td>Corporate HTML email template sent when weekly policy rules are violated.</td>
+        </tr>
+        <tr>
+          <td><code>app/repositories/attendance_repo.py</code></td>
+          <td>Repository</td>
+          <td>Direct PyMongo Async queries for attendance sessions, open sessions, and date filters.</td>
+        </tr>
+        <tr>
+          <td><code>app/workers/monitoring.py</code></td>
+          <td>Worker</td>
+          <td>Compliance evaluation worker with deduplication and retry backoff queues.</td>
+        </tr>
+        <tr>
+          <td><code>app/workers/scheduler.py</code></td>
+          <td>Scheduler</td>
+          <td>APScheduler cron job for automated midnight compliance audits.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. API Directory: What Each API Is Used For</h2>
+    <p>Below is the complete reference of all system endpoints, detailing target actors, core business functionality, and automated side effects.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Method & Endpoint</th>
+          <th>Target User</th>
+          <th>What It Is Used For & Key Inputs</th>
+          <th>Automated Actions & Side Effects</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-info">POST</span><br><code>/api/v1/attendance/entry</code></td>
+          <td>Employee / Biometrics</td>
+          <td><strong>Clock-In</strong>: Record arrival at office.<br><small>Inputs: employee_id, entry_time ("09:00"), date</small></td>
+          <td>Checks employee is active; prevents double clock-in (409); creates session with status PRESENT.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-danger">POST</span><br><code>/api/v1/attendance/exit</code></td>
+          <td>Employee / Biometrics</td>
+          <td><strong>Clock-Out</strong>: Record departure from office.<br><small>Inputs: employee_id, exit_time ("12:00"), date</small></td>
+          <td><strong>INSTANT ACTION</strong>: Computes hours. <strong>If &lt; 5.0h, instantly sends executive alert email to the employee.</strong></td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">POST</span><br><code>/api/v1/attendance/quick-record</code></td>
+          <td>Biometric Sync / Tester</td>
+          <td><strong>Combined Session</strong>: Clock-in and Clock-out together in one call.<br><small>Inputs: employee_id, date, entry_time, exit_time</small></td>
+          <td>Calculates session duration; triggers email alert immediately if &lt; 5.0h.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/api/v1/attendance/{id}</code></td>
+          <td>Employee / Manager</td>
+          <td><strong>Live Status</strong>: Checks current clock-in state.<br><small>Inputs: employee_id</small></td>
+          <td>Returns open clock-in session or today's completed hours.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/api/v1/attendance/{id}/history</code></td>
+          <td>Employee / HR Admin</td>
+          <td><strong>Attendance Timesheet</strong>: Complete history over date range.<br><small>Inputs: employee_id, start_date, end_date</small></td>
+          <td>Returns list of all session durations and timestamps.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">PATCH</span><br><code>/api/v1/attendance/session/{id}</code></td>
+          <td>HR Admin</td>
+          <td><strong>Attendance Regularization</strong>: Fix missed punch or incorrect time.<br><small>Inputs: attendance_id, entry_time, exit_time, notes</small></td>
+          <td>Recalculates session duration; writes record to immutable <code>audit_logs</code>.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">POST</span><br><code>/api/v1/leave</code></td>
+          <td>Employee (Self-Service)</td>
+          <td><strong>Apply for Leave</strong>: Request time-off (sick, casual, annual, unpaid).<br><small>Inputs: employee_id, leave_type, dates, reason</small></td>
+          <td>Validates dates; prevents overlaps (409 Conflict); creates PENDING leave without admin login.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/api/v1/leave</code></td>
+          <td>HR Admin / Manager</td>
+          <td><strong>List Leave Requests</strong>: Filter applications by employee/status.<br><small>Inputs: employee_id, status (pending/approved)</small></td>
+          <td>Returns filtered list of leave requests.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/api/v1/leave/{id}</code></td>
+          <td>Employee / HR Admin</td>
+          <td><strong>Leave Details</strong>: Inspect application and review history.<br><small>Inputs: leave_id</small></td>
+          <td>Returns detailed status and reviewer remarks.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">PATCH</span><br><code>/api/v1/leave/{id}/approve</code></td>
+          <td>HR Admin</td>
+          <td><strong>Approve Leave</strong>: Grants requested time off.<br><small>Inputs: leave_id, optional note</small></td>
+          <td><strong>POLICY PROTECTION</strong>: Excuses leave days, proportionally reducing weekly required days/hours during audits.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-danger">PATCH</span><br><code>/api/v1/leave/{id}/reject</code></td>
+          <td>HR Admin</td>
+          <td><strong>Reject Leave</strong>: Declines time-off request.<br><small>Inputs: leave_id, rejection reason</small></td>
+          <td>Marks status as REJECTED with recorded remarks.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">POST</span><br><code>/api/v1/holidays</code></td>
+          <td>HR Admin</td>
+          <td><strong>Declare Company Holiday</strong>: Adds official holiday.<br><small>Inputs: name, date, description</small></td>
+          <td>Stores holiday; automatically excused from weekly attendance targets.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/api/v1/holidays</code></td>
+          <td>All Users</td>
+          <td><strong>Holiday Calendar</strong>: Lists declared company holidays.<br><small>Inputs: optional year</small></td>
+          <td>Returns holiday calendar.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">POST</span><br><code>/api/v1/employees</code></td>
+          <td>HR Admin</td>
+          <td><strong>Onboard Employee</strong>: Registers employee in directory.<br><small>Inputs: employee_id, name, email, department, role</small></td>
+          <td>Ensures unique employee_id and email; logs audit trail.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/api/v1/employees</code></td>
+          <td>HR Admin</td>
+          <td><strong>Employee Directory</strong>: Search and list workforce.<br><small>Inputs: search, department, is_active, page</small></td>
+          <td>Returns paginated list of employees.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">PATCH</span><br><code>/api/v1/employees/{id}</code></td>
+          <td>HR Admin</td>
+          <td><strong>Update Employee</strong>: Edit department, email, role.<br><small>Inputs: employee_id, profile fields</small></td>
+          <td>Updates employee record in MongoDB.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-danger">DELETE</span><br><code>/api/v1/employees/{id}</code></td>
+          <td>HR Admin</td>
+          <td><strong>Offboard Employee</strong>: Deactivate employee.<br><small>Inputs: employee_id</small></td>
+          <td>Soft-deletes employee (<code>is_active = false</code>) preserving audit trail.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/api/v1/reports/attendance</code></td>
+          <td>HR / Executives</td>
+          <td><strong>Attendance Summary</strong>: Aggregated compliance report.<br><small>Inputs: start_date, end_date, department</small></td>
+          <td>Calculates days attended, hours, averages, and lists all policy violations.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/api/v1/reports/attendance/export.csv</code></td>
+          <td>HR / Payroll</td>
+          <td><strong>CSV Export</strong>: Download attendance spreadsheet.<br><small>Inputs: start_date, end_date, department</small></td>
+          <td>Streams raw CSV file for payroll and Excel integration.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">POST</span><br><code>/api/v1/auth/login</code></td>
+          <td>Administrators</td>
+          <td><strong>Admin Login</strong>: Authenticates admin and generates JWT.<br><small>Inputs: username, password</small></td>
+          <td>Issues signed Bearer access token valid for 24 hours.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-info">POST</span><br><code>/api/v1/admin/monitoring/run</code></td>
+          <td>HR Admin / Cron</td>
+          <td><strong>Run Weekly Audit On-Demand</strong>: Evaluates 3 days / 15 hrs / 5 hrs rules.<br><small>Inputs: include_current_week, force_resend</small></td>
+          <td>Evaluates all employees, adjusts for leaves/holidays, and sends weekly violation emails.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-success">GET</span><br><code>/health/ready</code></td>
+          <td>DevOps / Kubernetes</td>
+          <td><strong>Readiness Probe</strong>: Verifies MongoDB connectivity.<br><small>Inputs: none</small></td>
+          <td>Pings database; returns 200 OK or 503 Service Unavailable.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>5. Key Workflows & Swagger Testing Guide</h2>
+
+    <h3>A. Daily Check-in & Exit Before 5 Hours (< 5.0 hrs)</h3>
+    <ol>
+      <li><strong>Employee Check-In at 09:00</strong>:<br>
+          Call <code>POST /api/v1/attendance/entry</code> with:
+          <pre>{ "employee_id": "EMP-007", "entry_time": "09:00" }</pre>
+      </li>
+      <li><strong>Employee Check-Out at 12:00 (3 hours completed)</strong>:<br>
+          Call <code>POST /api/v1/attendance/exit</code> with:
+          <pre>{ "employee_id": "EMP-007", "exit_time": "12:00" }</pre>
+      </li>
+      <li><strong>Result</strong>:
+          <ul>
+            <li>Session saved successfully with <code>total_hours: 3.0</code> and status <code>complete</code>.</li>
+            <li>Response returns: <code>"policy_alert": "Policy non-compliance: 3.00 hrs is less than mandatory 5.0 hrs/day. Automated alert email dispatched..."</code></li>
+            <li>The employee receives an official email alert immediately.</li>
+          </ul>
+      </li>
+    </ol>
+
+    <h3>B. Single-Click Quick Record</h3>
+    <p>Call <code>POST /api/v1/attendance/quick-record</code>:</p>
+    <pre>{
+  "employee_id": "EMP-007",
+  "date": "2026-10-09",
+  "entry_time": "09:00",
+  "exit_time": "12:00"
+}</pre>
+
+    <h3>C. Employee Self-Service Leave Request</h3>
+    <ol>
+      <li><strong>Employee Submits Leave</strong> (No Admin token required):<br>
+          Call <code>POST /api/v1/leave</code> with:
+          <pre>{
+  "employee_id": "EMP-007",
+  "leave_type": "sick",
+  "start_date": "2026-10-12",
+  "end_date": "2026-10-13",
+  "reason": "Doctor appointment"
+}</pre>
+      </li>
+      <li><strong>Manager Approves</strong>:<br>
+          Call <code>PATCH /api/v1/leave/{leave_id}/approve</code> with note: <code>{"note": "Approved"}</code>.
+      </li>
+      <li><strong>Protection</strong>:
+          Approved leave days are automatically excused by the policy engine, reducing required weekly days and hours proportionally so no violation email is triggered.
+      </li>
+    </ol>
+
+    <h2>6. Email Delivery Modes</h2>
+    <div class="card">
+      <p>Configure in <code>.env</code>:</p>
+      <pre># Mode 1: Console Logging (Development)
+EMAIL_DELIVERY_MODE=console
+
+# Mode 2: Live Gmail SMTP Delivery
+EMAIL_DELIVERY_MODE=smtp
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_16_digit_app_password
+SMTP_FROM_ADDRESS=your_email@gmail.com
+SMTP_FROM_NAME=CAMS Attendance System
+SMTP_USE_TLS=true</pre>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Central Attendance Management System (CAMS) &bull; Enterprise HR & Compliance Division &bull; Confidential
+  </div>
+</div>
+
+</body>
+</html>

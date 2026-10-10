@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Attendance Policy Compliance Alert</title>
+</head>
+<body style="margin:0;padding:24px;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);border:1px solid #e2e8f0;">
+    <!-- Header -->
+    <tr>
+      <td style="background-color:#0f172a;padding:28px 32px;text-align:left;border-bottom:3px solid #3b82f6;">
+        <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">
+          Central Attendance Management System (CAMS)
+        </div>
+        <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;">
+          Daily Attendance Policy Compliance Alert
+        </h1>
+      </td>
+    </tr>
+    <!-- Alert Banner -->
+    <tr>
+      <td style="padding:24px 32px 12px 32px;">
+        <div style="background-color:#fef2f2;border-left:4px solid #ef4444;padding:14px 18px;border-radius:0 6px 6px 0;">
+          <div style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:4px;">
+            ⚠️ ACTION REQUIRED: Minimum Working Hours Deficit
+          </div>
+          <div style="font-size:13px;color:#7f1d1d;line-height:1.5;">
+            Our automated monitoring system recorded an exit before the mandatory <strong>5.0 hours</strong> daily threshold was completed on <strong>{attendance_date}</strong>.
+          </div>
+        </div>
+      </td>
+    </tr>
+    <!-- Employee Information -->
+    <tr>
+      <td style="padding:12px 32px;">
+        <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">
+          Employee Profile
+        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;">
+          <tr>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;width:38%;">Employee Name</td>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:600;">{employee_name}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;">Employee ID</td>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:600;"><span style="background:#e2e8f0;padding:2px 8px;border-radius:4px;font-family:monospace;">{employee_id}</span></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;">Department</td>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:600;">{department}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 16px;color:#64748b;">Official Email</td>
+            <td style="padding:10px 16px;color:#0f172a;font-weight:600;">{employee_email}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <!-- Attendance Record Details -->
+    <tr>
+      <td style="padding:12px 32px;">
+        <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">
+          Session Record Details
+        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;">
+          <tr>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;width:38%;">Attendance Date</td>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:600;">{attendance_date}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;">Check-In (Entry) Time</td>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:600;">{entry_time_str}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;">Check-Out (Exit) Time</td>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:600;">{exit_time_str}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;">Total Hours Logged</td>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#dc2626;font-weight:700;font-size:14px;">{hours_worked} Hours</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;">Mandatory Daily Requirement</td>
+            <td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:600;">{min_required_hours} Hours</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 16px;color:#64748b;">Hours Deficit</td>
+            <td style="padding:10px 16px;color:#dc2626;font-weight:700;"><span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:4px;">-{deficit} Hours</span></td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <!-- Policy Guidelines -->
+    <tr>
+      <td style="padding:12px 32px;">
+        <div style="background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:16px 20px;">
+          <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:8px;">
+            📋 Company Office Attendance Policy Reminder
+          </div>
+          <ul style="margin:0;padding-left:20px;font-size:13px;color:#15803d;line-height:1.6;">
+            <li><strong>Daily Minimum:</strong> Every employee must attend office for at least <strong>5.0 hours</strong> per attended day.</li>
+            <li><strong>Weekly Frequency:</strong> Every employee must work from office for at least <strong>3 days per week</strong>.</li>
+            <li><strong>Weekly Minimum:</strong> Total office presence must reach at least <strong>15.0 hours per week</strong>.</li>
+          </ul>
+        </div>
+      </td>
+    </tr>
+    <!-- Next Steps -->
+    <tr>
+      <td style="padding:12px 32px 24px 32px;">
+        <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px 20px;font-size:13px;color:#475569;line-height:1.6;">
+          <div style="font-weight:700;color:#1e293b;margin-bottom:4px;">Next Steps / Regularization:</div>
+          • If you departed early with supervisor approval, please coordinate with your reporting manager.<br>
+          • If this was due to a missed swipe or technical error, please submit an <strong>Attendance Correction</strong> request via the CAMS portal.<br>
+          • For HR inquiries or attendance disputes, contact the HR Compliance Desk.
+        </div>
+      </td>
+    </tr>
+    <!-- Footer -->
+    <tr>
+      <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 32px;text-align:center;font-size:12px;color:#94a3b8;line-height:1.5;">
+        This is an automated notification dispatched by the <strong>Central Attendance Management System (CAMS)</strong>.<br>
+        Please do not reply directly to this email.<br>
+        © CAMS Attendance Compliance Team. All rights reserved.
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
