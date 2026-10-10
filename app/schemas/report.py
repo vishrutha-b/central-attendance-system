@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from datetime import date as dt_date
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -14,9 +15,9 @@ ReportPeriod = Literal["daily", "weekly", "monthly", "yearly", "custom"]
 
 class ReportQueryParams(CAMSBaseModel):
     period: ReportPeriod
-    date: date | None = None  # daily
-    start_date: date | None = None  # weekly, custom
-    end_date: date | None = None  # custom
+    date: dt_date | None = None  # daily
+    start_date: dt_date | None = None  # weekly, custom
+    end_date: dt_date | None = None  # custom
     year: int | None = None  # monthly, yearly
     month: int | None = Field(default=None, ge=1, le=12)  # monthly
     department: str | None = None

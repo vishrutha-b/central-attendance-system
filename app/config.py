@@ -33,14 +33,14 @@ class Settings(BaseSettings):
     mongodb_test_db_name: str = "cams_test"
 
     # ── JWT ───────────────────────────────────────────────────────────────────
-    jwt_secret: str = Field(min_length=32)
+    jwt_secret: str = Field(default="dev_secret_key_at_least_32_characters_long", min_length=32)
     jwt_algorithm: str = "HS256"
     jwt_expiry_minutes: int = 60
 
     # ── Initial Admin ────────────────────────────────────────────────────────
     initial_admin_username: str = "admin"
     initial_admin_email: str = "admin@company.com"
-    initial_admin_password: str = Field(min_length=8)
+    initial_admin_password: str = Field(default="Admin@123456", min_length=8)
 
     # ── Company Settings ──────────────────────────────────────────────────────
     company_timezone: str = "Asia/Kolkata"

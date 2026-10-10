@@ -64,7 +64,7 @@ class LeaveService:
             actor_id=actor_id,
             action="leave.create",
             resource_type="leave_request",
-            resource_id=doc["leave_id"],
+            resource_id=str(doc["leave_id"]),
             employee_id=data.employee_id,
         )
         return created

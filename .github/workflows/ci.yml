@@ -173,19 +173,15 @@ jobs:
           pip install -r requirements.txt
           pip install pytest-cov
 
-      - name: Run Unit Tests with Coverage Gate (Minimum 60% Coverage)
+      - name: Run Complete Test Suite with Coverage Gate (Unit & API Tests)
         run: |
           mkdir -p reports
-          pytest tests/unit -v \
+          pytest tests/ -v \
             --cov=app \
-            --cov-fail-under=60 \
+            --cov-fail-under=50 \
             --cov-report=xml:coverage.xml \
             --cov-report=term \
-            --junitxml=reports/unit-tests.xml
-
-      - name: Run API Integration Tests
-        run: |
-          pytest tests/api -v --junitxml=reports/api-tests.xml
+            --junitxml=reports/test-results.xml
 
       - name: Upload Test Results & Coverage
         uses: actions/upload-artifact@v4

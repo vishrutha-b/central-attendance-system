@@ -32,7 +32,7 @@ def parse_flexible_datetime(
     try:
         tz = ZoneInfo(company_tz_name)
     except Exception:
-        tz = UTC
+        tz = ZoneInfo("UTC")
 
     now = datetime.now(tz=UTC)
 

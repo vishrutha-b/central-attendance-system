@@ -74,6 +74,14 @@ class AttendanceService:
                 "Record exit before starting a new session."
             )
 
+        now = datetime.now(tz=UTC)
+        if isinstance(data.entry_time, datetime):
+            entry_dt = data.entry_time
+        elif data.entry_time:
+            entry_dt = datetime.fromisoformat(str(data.entry_time))
+        else:
+            entry_dt = now
+
         # Resolve the attendance date: explicit date field wins, else derive from entry_time
         if data.date is not None:
             if isinstance(data.date, str):
@@ -81,15 +89,14 @@ class AttendanceService:
             else:
                 attendance_date = data.date.isoformat()
         else:
-            attendance_date = _session_to_date_str(data.entry_time, self.company_tz)
-        now = datetime.now(tz=UTC)
+            attendance_date = _session_to_date_str(entry_dt, self.company_tz)
         attendance_id = f"ATT-{uuid.uuid4().hex[:12].upper()}"
 
         doc = {
             "attendance_id": attendance_id,
             "employee_id": data.employee_id,
             "date": attendance_date,
-            "entry_time": data.entry_time,
+            "entry_time": entry_dt,
             "exit_time": None,
             "total_hours": 0.0,
             "attendance_status": "incomplete",
@@ -105,7 +112,7 @@ class AttendanceService:
             resource_type="attendance",
             resource_id=attendance_id,
             employee_id=data.employee_id,
-            new_values={"entry_time": data.entry_time.isoformat(), "date": attendance_date},
+            new_values={"entry_time": entry_dt.isoformat(), "date": attendance_date},
         )
         return created
 
