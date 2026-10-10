@@ -165,12 +165,20 @@ jobs:
           name: test-and-coverage-reports
         continue-on-error: true
 
-      - name: Notice (SonarQube Token Missing)
-        if: "${{ secrets.SONAR_TOKEN == '' }}"
-        run: echo "SONAR_TOKEN secret is not configured in GitHub repository secrets. Skipping scan."
+      - name: Check SonarQube Configuration
+        id: check_sonar
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ Notice: SONAR_TOKEN secret is not configured in repository secrets. Skipping scan."
+          fi
 
       - name: SonarQube / SonarCloud Scan
-        if: "${{ secrets.SONAR_TOKEN != '' }}"
+        if: steps.check_sonar.outputs.has_token == 'true'
         uses: SonarSource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
