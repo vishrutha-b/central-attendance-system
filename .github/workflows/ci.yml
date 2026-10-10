@@ -49,8 +49,7 @@ jobs:
         run: ruff check app/ tests/ scripts/
 
       - name: Run MyPy Static Type Check
-        run: mypy --explicit-package-bases --ignore-missing-imports app/
-        continue-on-error: true
+        run: mypy --explicit-package-bases --ignore-missing-imports app/ || true
 
   # ─── 3. BRANCH B: SECURITY SCANS ───────────────────────────────────────────
   security-scans:
@@ -78,12 +77,10 @@ jobs:
         run: bandit -r app/ -ll -s B104
 
       - name: Run Pip-Audit (Dependency Vulnerability Scan)
-        run: pip-audit -r requirements.txt
-        continue-on-error: true
+        run: pip-audit -r requirements.txt || true
 
       - name: Run Safety (Dependency Security Checks)
         run: safety scan --file=requirements.txt || safety check -r requirements.txt || true
-        continue-on-error: true
 
       - name: Run Gitleaks (Secret Leak Detection)
         uses: gitleaks/gitleaks-action@v2
@@ -168,7 +165,12 @@ jobs:
           name: test-and-coverage-reports
         continue-on-error: true
 
+      - name: Notice (SonarQube Token Missing)
+        if: "${{ secrets.SONAR_TOKEN == '' }}"
+        run: echo "SONAR_TOKEN secret is not configured in GitHub repository secrets. Skipping scan."
+
       - name: SonarQube / SonarCloud Scan
+        if: "${{ secrets.SONAR_TOKEN != '' }}"
         uses: SonarSource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
