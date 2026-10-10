@@ -282,14 +282,29 @@ jobs:
           echo "🚀 Starting CAMS stack with MongoDB for live integration test..."
           docker compose up -d mongodb api
 
-          echo "🔍 Probing live health endpoint..."
-          curl --retry 10 --retry-delay 2 --retry-connrefused -f http://localhost:8000/health/live
+          echo "⏳ Waiting for API container to initialize and accept connections..."
+          SUCCESS=0
+          for i in $(seq 1 25); do
+            if curl -sf http://localhost:8000/health/live >/dev/null 2>&1; then
+              echo "✅ API is live and responding (attempt $i)!"
+              SUCCESS=1
+              break
+            fi
+            echo "Waiting for application startup... ($i/25)"
+            sleep 2
+          done
+
+          if [ $SUCCESS -ne 1 ]; then
+            echo "❌ API failed to respond within 50 seconds. Outputting container logs:"
+            docker compose logs api
+            exit 1
+          fi
 
           echo "🔍 Probing database readiness endpoint..."
-          curl --retry 10 --retry-delay 2 --retry-connrefused -f http://localhost:8000/health/ready
+          curl -sf http://localhost:8000/health/ready || (docker compose logs api && exit 1)
 
           echo "🔍 Probing frontend root UI..."
-          curl -f http://localhost:8000/
+          curl -sf http://localhost:8000/ >/dev/null || (docker compose logs api && exit 1)
 
           echo "🧹 Stopping smoke test stack..."
           docker compose down
