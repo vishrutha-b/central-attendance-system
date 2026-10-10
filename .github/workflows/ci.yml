@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # 1. FRONTEND: LINTING, SYNTAX & CLIENT-SIDE SECURITY
+  # 1. FRONTEND: LINTING, SYNTAX & CLIENT-SIDE QUALITY GATE
   # ─────────────────────────────────────────────────────────────────────────────
   frontend-verification:
     name: Frontend Quality & Security
@@ -26,6 +26,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
       - name: Verify JavaScript Syntax
         run: |
@@ -33,19 +34,18 @@ jobs:
           node --check static/js/app.js
           node --check static/js/api.js
 
-      - name: Install Frontend Linters
-        run: |
-          npm install --no-save htmlhint eslint @eslint/js globals
+      - name: Install Frontend Dependencies
+        run: npm ci
 
       - name: Run HTMLHint (HTML Structure & Security)
         run: |
           echo "🔍 Validating HTML markup..."
-          npx htmlhint "static/**/*.html" --rules "tag-pair=true,spec-char-escape=true,id-unique=true,attr-no-duplication=true" || true
+          npx htmlhint "static/**/*.html" --rules "tag-pair=true,spec-char-escape=true,id-unique=true,attr-no-duplication=true"
 
-      - name: Run ESLint (Client-side JavaScript Quality & Hygiene)
+      - name: Run ESLint (Flat Config JavaScript Quality)
         run: |
           echo "🔍 Linting JavaScript files..."
-          npx eslint static/js/ --env es2022,browser || true
+          npx eslint static/js/
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 2. BACKEND: SYNTAX, RUFF LINTING & MYPY TYPE CHECKING
@@ -63,32 +63,33 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Check Python Syntax (Byte-compile)
-        run: |
-          python -m compileall app/ tests/ scripts/
-
-      - name: Install Linters & Type Checker
+      - name: Install Project Dependencies & Linters
         run: |
           python -m pip install --upgrade pip
+          pip install -r requirements.txt
           pip install ruff==0.8.4 mypy==1.13.0
+
+      - name: Check Python Syntax (Byte-compile)
+        run: |
+          python -m compileall -q app tests scripts
 
       - name: Run Ruff Linter
         run: |
           echo "🔍 Running Ruff linter..."
-          ruff check app/ tests/ scripts/
+          ruff check app tests scripts
 
       - name: Run Ruff Formatter Check
         run: |
-          echo "🔍 Running Ruff format check..."
-          ruff format --check app/ tests/ scripts/ || true
+          echo "🔍 Enforcing code formatting standard..."
+          ruff format --check app tests scripts
 
       - name: Run MyPy Static Type Check
         run: |
           echo "🔍 Running MyPy type analysis..."
-          mypy --explicit-package-bases --ignore-missing-imports app/ || true
+          mypy --explicit-package-bases --ignore-missing-imports app
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 3. SECURITY SCANS: SAST, DEPENDENCY VULNERABILITIES & SECRET LEAKS
+  # 3. SECURITY SCANS: SAST, DEPENDENCY VULNERABILITIES & SECRET DETECTION
   # ─────────────────────────────────────────────────────────────────────────────
   security-scans:
     name: Security Scans (Bandit, Audit, Semgrep & Secrets)
@@ -108,9 +109,9 @@ jobs:
       - name: Install Security Tools
         run: |
           python -m pip install --upgrade pip
-          pip install bandit==1.8.0 pip-audit==2.7.3 safety
+          pip install bandit==1.8.0 pip-audit==2.7.3 safety semgrep
 
-      - name: Run Bandit (Python SAST Scan)
+      - name: Run Bandit (Python SAST Security Scan)
         run: |
           echo "🛡️ Running Bandit static application security testing..."
           bandit -r app/ -ll -s B104
@@ -118,27 +119,20 @@ jobs:
       - name: Run Pip-Audit (Dependency Vulnerability Scanner)
         run: |
           echo "🛡️ Auditing Python dependencies against advisory databases..."
-          pip-audit -r requirements.txt || true
-
-      - name: Run Safety Scan (Dependency Vulnerabilities)
-        run: |
-          echo "🛡️ Running Safety dependency check..."
-          safety scan --file=requirements.txt || safety check -r requirements.txt || true
+          pip-audit -r requirements.txt --desc || true
 
       - name: Run Semgrep SAST (Frontend & Backend OWASP Top 10)
         run: |
-          python -m pip install semgrep
           echo "🛡️ Scanning for OWASP vulnerabilities across frontend & backend..."
           semgrep scan --config auto --severity ERROR --error || true
 
-      - name: Run Gitleaks (Secret Leak Detection)
+      - name: Run Gitleaks (Secret Leak Detection Gate)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 4. TEST SUITE: AUTOMATED UNIT & INTEGRATION TESTS
+  # 4. TEST SUITE: AUTOMATED UNIT & INTEGRATION TESTS WITH COVERAGE GATE
   # ─────────────────────────────────────────────────────────────────────────────
   test-suite:
     name: Automated Unit & API Tests
@@ -179,10 +173,15 @@ jobs:
           pip install -r requirements.txt
           pip install pytest-cov
 
-      - name: Run Unit Tests with Coverage
+      - name: Run Unit Tests with Coverage Gate (Minimum 60% Coverage)
         run: |
           mkdir -p reports
-          pytest tests/unit -v --cov=app --cov-report=xml:coverage.xml --cov-report=term --junitxml=reports/unit-tests.xml
+          pytest tests/unit -v \
+            --cov=app \
+            --cov-fail-under=60 \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term \
+            --junitxml=reports/unit-tests.xml
 
       - name: Run API Integration Tests
         run: |
@@ -235,13 +234,12 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        continue-on-error: true
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 6. DOCKER: HADOLINT, MULTI-TIER BUILD & TRIVY SECURITY VULNERABILITY SCAN
+  # 6. DOCKER: HADOLINT, MULTI-TIER BUILD, SMOKE TEST & TRIVY SECURITY GATE
   # ─────────────────────────────────────────────────────────────────────────────
   docker-build-and-security:
-    name: Docker Build & Container Security Scan
+    name: Docker Build, Smoke Test & Security Gate
     runs-on: ubuntu-latest
     needs: [backend-quality, frontend-verification, security-scans, test-suite]
     steps:
@@ -253,7 +251,6 @@ jobs:
         with:
           dockerfile: Dockerfile
           failure-threshold: warning
-        continue-on-error: true
 
       - name: Set Up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -266,15 +263,38 @@ jobs:
             --tag cams-app:latest \
             .
 
-      - name: Run Trivy Vulnerability Scanner on Docker Image
+      - name: Container Smoke Test (Health Endpoint & UI Verification)
+        run: |
+          echo "🚀 Starting container for live health probe..."
+          docker run -d \
+            --name cams-smoke-check \
+            -p 8000:8000 \
+            -e APP_ENV=testing \
+            -e JWT_SECRET=test_secret_key_at_least_32_characters_long_for_security \
+            -e INITIAL_ADMIN_PASSWORD=TestAdminPassword123! \
+            cams-app:latest
+
+          sleep 5
+
+          echo "🔍 Probing live health endpoint..."
+          curl --retry 5 --retry-delay 2 --retry-connrefused -f http://localhost:8000/health/live || (docker logs cams-smoke-check && exit 1)
+
+          echo "🔍 Probing frontend root UI..."
+          curl -f http://localhost:8000/ || exit 1
+
+          docker stop cams-smoke-check
+          docker rm cams-smoke-check
+          echo "✅ Container smoke test passed successfully!"
+
+      - name: Run Trivy Vulnerability Gate on Docker Image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: cams-app:${{ github.sha }}
           format: "table"
-          exit-code: "0"
+          exit-code: "1"
           ignore-unfixed: true
           vuln-type: "os,library"
-          severity: "CRITICAL,HIGH"
+          severity: "CRITICAL"
 
       - name: Run Trivy Config Scanner (Dockerfile & Compose Security)
         uses: aquasecurity/trivy-action@master
@@ -293,11 +313,26 @@ jobs:
           format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
-        continue-on-error: true
 
       - name: Upload Trivy SARIF Scan to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: "trivy-results.sarif"
-        continue-on-error: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 7. CONTINUOUS DEPLOYMENT (CD): REGISTRY PUSH & DEPLOYMENT GATEWAY
+  # ─────────────────────────────────────────────────────────────────────────────
+  cd-deploy:
+    name: Continuous Deployment
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [docker-build-and-security, sonarqube]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deployment Gateway Status
+        run: |
+          echo "🚀 All CI Quality & Security gates passed!"
+          echo "📦 Ready for container deployment to production target (Cloud Run / ECS / K8s)."

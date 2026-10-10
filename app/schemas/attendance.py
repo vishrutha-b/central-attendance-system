@@ -146,8 +146,7 @@ class AttendanceExitRequest(CAMSBaseModel):
         Field(
             default=None,
             description=(
-                "Exit time (e.g. '18:00' or ISO timestamp). "
-                "Defaults to current time if omitted."
+                "Exit time (e.g. '18:00' or ISO timestamp). " "Defaults to current time if omitted."
             ),
             examples=["18:00"],
         ),
@@ -206,8 +205,7 @@ class AttendanceQuickRecordRequest(CAMSBaseModel):
         Field(
             default=None,
             description=(
-                "Exit time (e.g. '18:00', '18:30', or full ISO). "
-                "Defaults to 18:00 (6:00 PM)."
+                "Exit time (e.g. '18:00', '18:30', or full ISO). " "Defaults to 18:00 (6:00 PM)."
             ),
             examples=["18:00"],
         ),

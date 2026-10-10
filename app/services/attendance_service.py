@@ -232,12 +232,8 @@ class AttendanceService:
         existing = await self.attendance_repo.get_or_raise(attendance_id)
 
         # Normalize existing datetimes from MongoDB (may be naive UTC)
-        existing_entry = (
-            _ensure_utc(existing["entry_time"]) if existing.get("entry_time") else None
-        )
-        existing_exit = (
-            _ensure_utc(existing["exit_time"]) if existing.get("exit_time") else None
-        )
+        existing_entry = _ensure_utc(existing["entry_time"]) if existing.get("entry_time") else None
+        existing_exit = _ensure_utc(existing["exit_time"]) if existing.get("exit_time") else None
 
         old_values = {
             "entry_time": existing_entry.isoformat() if existing_entry else None,
@@ -280,7 +276,6 @@ class AttendanceService:
             outcome="corrected",
         )
         return updated
-
 
     async def get_attendance_for_date(
         self, employee_id: str, attendance_date: str

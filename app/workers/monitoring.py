@@ -70,6 +70,7 @@ async def run_monitoring_cycle(
     weeks_to_check = _get_completed_weeks(today, thresholds.week_start_day, lookback_weeks=4)
 
     from app.services.policy_service import get_week_boundary
+
     current_wb = get_week_boundary(today, thresholds.week_start_day)
 
     if include_current_week and not any(w.start == current_wb.start for w in weeks_to_check):
@@ -216,17 +217,21 @@ async def run_monitoring_cycle(
                 )
                 logger.warning("Notification delivery failed for %s, scheduled retry.", emp_id)
 
-            details.append({
-                "employee_id": emp_id,
-                "employee_name": emp_name,
-                "employee_email": emp_email,
-                "week": f"{week.start.isoformat()} to {(week.end - timedelta(days=1)).isoformat()}",
-                "days_attended": result.days_attended,
-                "total_hours": result.total_hours,
-                "avg_hours_per_day": result.avg_hours_per_day,
-                "violations": result.violation_reasons,
-                "notification_sent": success,
-            })
+            details.append(
+                {
+                    "employee_id": emp_id,
+                    "employee_name": emp_name,
+                    "employee_email": emp_email,
+                    "week": (
+                        f"{week.start.isoformat()} to {(week.end - timedelta(days=1)).isoformat()}"
+                    ),
+                    "days_attended": result.days_attended,
+                    "total_hours": result.total_hours,
+                    "avg_hours_per_day": result.avg_hours_per_day,
+                    "violations": result.violation_reasons,
+                    "notification_sent": success,
+                }
+            )
 
     # Process pending retries
     retry_count = await _process_retries(
