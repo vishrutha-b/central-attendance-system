@@ -86,7 +86,6 @@ class AdminRepository:
         return res.modified_count > 0
 
 
-
 class AuditRepository:
     def __init__(self, db: Any, tenant_id: str = "default") -> None:
         self.col = db.audit_logs

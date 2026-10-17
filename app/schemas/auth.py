@@ -91,4 +91,3 @@ class ResetPasswordRequest(CAMSBaseModel):
 class ResetPasswordResponse(CAMSBaseModel):
     message: str
     tenant_id: str
-

@@ -306,4 +306,3 @@ async def test_reset_password_success(async_client: AsyncClient):
         )
         assert response.status_code == 200
         assert "Password successfully reset" in response.json()["message"]
-

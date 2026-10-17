@@ -525,4 +525,3 @@ async def reset_password(
         "message": "Password successfully reset. You may now sign in.",
         "tenant_id": active_tenant_id,
     }
-

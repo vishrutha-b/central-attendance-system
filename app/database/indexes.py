@@ -316,4 +316,3 @@ async def _create_password_reset_indexes(db: Any) -> None:
     ]
     await collection.create_indexes(indexes)
     logger.debug("password_reset_tokens indexes created.")
-

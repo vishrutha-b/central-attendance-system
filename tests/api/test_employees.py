@@ -145,9 +145,7 @@ async def test_get_employee_not_found(async_client: AsyncClient, auth_headers: d
         mock_admin_find.return_value = mock_admin
         mock_find.return_value = None
 
-        response = await async_client.get(
-            "/api/v1/employees/EMP-NONEXISTENT", headers=auth_headers
-        )
+        response = await async_client.get("/api/v1/employees/EMP-NONEXISTENT", headers=auth_headers)
         assert response.status_code == 404
 
 

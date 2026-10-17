@@ -191,7 +191,6 @@ class NotificationService:
         return await _send_via_smtp(to_email, subject, body, settings, html_body=html_body)
 
 
-
 async def _send_via_smtp(
     to_address: str,
     subject: str,

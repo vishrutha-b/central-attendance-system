@@ -147,7 +147,6 @@ def get_password_reset_repo(
     return PasswordResetRepository(db, tenant_id=tenant_id)
 
 
-
 # ── Service factories ─────────────────────────────────────────────────────────
 
 
