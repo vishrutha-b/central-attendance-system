@@ -9,7 +9,12 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.dependencies import get_admin_repo, get_tenant_repo, require_admin
+from app.api.dependencies import (
+    get_admin_repo,
+    get_tenant_repo,
+    require_admin,
+    require_super_admin,
+)
 from app.repositories.admin_repo import AdminRepository
 from app.repositories.tenant_repo import TenantNotFoundError, TenantRepository
 from app.schemas.tenant import (
@@ -27,14 +32,17 @@ router = APIRouter(prefix="/tenants", tags=["Tenants & Multi-Tenancy"])
     "",
     response_model=TenantResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Onboard new tenant organization (Admin / Super-Admin only)",
-    description="Provision a new tenant organization with isolated attendance and policy configs.",
+    summary="Onboard new tenant organization (Super-Admin only)",
+    description=(
+        "Provision a new tenant organization with isolated attendance and policy configs. "
+        "Only Super Admin can perform this action."
+    ),
 )
 async def onboard_tenant(
     data: TenantCreateRequest,
     tenant_repo: TenantRepository = Depends(get_tenant_repo),
     admin_repo: AdminRepository = Depends(get_admin_repo),
-    _current_admin: dict[str, Any] = Depends(require_admin),
+    _current_admin: dict[str, Any] = Depends(require_super_admin),
 ) -> dict[str, Any]:
     existing = await tenant_repo.find_by_id(data.tenant_id)
     if existing:
@@ -70,7 +78,7 @@ async def onboard_tenant(
         }
         await admin_repo.create(admin_doc)
         logger.info(
-            "Created initial admin '%s' for tenant '%s'.",
+            "Created initial tenant admin '%s' for tenant '%s'.",
             data.admin_username,
             data.tenant_id,
         )
@@ -82,17 +90,28 @@ async def onboard_tenant(
     "",
     response_model=list[TenantResponse],
     summary="List all tenant organizations",
-    description="Returns all registered tenant organizations (Admin access required).",
+    description=(
+        "Returns registered tenant organizations. Super-Admin sees all organizations; "
+        "tenant admins see only their own organization."
+    ),
 )
 async def list_tenants(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     status_filter: str | None = Query(None, alias="status"),
     tenant_repo: TenantRepository = Depends(get_tenant_repo),
-    _current_admin: dict[str, Any] = Depends(require_admin),
+    current_admin: dict[str, Any] = Depends(require_admin),
 ) -> list[dict[str, Any]]:
-    items, _ = await tenant_repo.list_tenants(skip=skip, limit=limit, status=status_filter)
-    return items
+    if current_admin["role"] == "super_admin":
+        items, _ = await tenant_repo.list_tenants(skip=skip, limit=limit, status=status_filter)
+        return items
+
+    # Tenant admin only sees their assigned tenant
+    tenant_id = current_admin.get("tenant_id")
+    if tenant_id:
+        tenant = await tenant_repo.find_by_id(tenant_id)
+        return [tenant] if tenant else []
+    return []
 
 
 @router.get(

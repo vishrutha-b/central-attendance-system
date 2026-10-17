@@ -19,6 +19,9 @@ class AdminRepository:
         self.tenant_id = tenant_id
 
     async def create(self, doc: dict[str, Any]) -> dict[str, Any]:
+        # Enforce that NO ONE else can be super_admin except vishrutha
+        if doc.get("role") == "super_admin" and doc.get("username") != "vishrutha":
+            doc["role"] = "admin"
         doc["tenant_id"] = self.tenant_id
         try:
             await self.col.insert_one(doc)
@@ -37,6 +40,19 @@ class AdminRepository:
     async def find_by_email(self, email: str) -> dict[str, Any] | None:
         return await self.col.find_one(
             {"tenant_id": self.tenant_id, "email": email.lower()},
+            {"_id": 0},
+        )
+
+    async def find_super_admin(self, identifier: str) -> dict[str, Any] | None:
+        """Find the platform super admin by username or email regardless of tenant."""
+        return await self.col.find_one(
+            {
+                "$or": [
+                    {"username": identifier},
+                    {"email": identifier.lower()},
+                ],
+                "role": "super_admin",
+            },
             {"_id": 0},
         )
 

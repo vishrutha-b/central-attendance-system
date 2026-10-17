@@ -20,11 +20,15 @@ from app.workers.monitoring import run_all_tenants_monitoring_cycle
 
 
 @pytest.mark.asyncio
-async def test_tenant_onboarding_success(async_client: AsyncClient, auth_headers: dict[str, str]):
+async def test_tenant_onboarding_success(
+    async_client: AsyncClient, super_admin_auth_headers: dict[str, str]
+):
     payload = {
         "tenant_id": "acme-corp",
         "name": "Acme Corporation",
         "contact_email": "admin@acme.com",
+        "admin_username": "acme_admin",
+        "admin_password": "AcmePassword123!",
         "settings": {
             "company_timezone": "America/New_York",
             "min_days_per_week": 4,
@@ -41,9 +45,9 @@ async def test_tenant_onboarding_success(async_client: AsyncClient, auth_headers
     }
 
     mock_admin = {
-        "admin_id": "ADM-TEST-001",
-        "username": "testadmin",
-        "role": "admin",
+        "admin_id": "ADM-SUPER-001",
+        "username": "vishrutha",
+        "role": "super_admin",
         "is_active": True,
         "tenant_id": "default",
     }
@@ -58,12 +62,18 @@ async def test_tenant_onboarding_success(async_client: AsyncClient, auth_headers
         patch(
             "app.repositories.tenant_repo.TenantRepository.create", new_callable=AsyncMock
         ) as mock_create,
+        patch(
+            "app.repositories.admin_repo.AdminRepository.create", new_callable=AsyncMock
+        ) as mock_admin_create,
     ):
         mock_admin_find.return_value = mock_admin
         mock_find.return_value = None
         mock_create.return_value = mock_created
+        mock_admin_create.return_value = {}
 
-        response = await async_client.post("/api/v1/tenants", json=payload, headers=auth_headers)
+        response = await async_client.post(
+            "/api/v1/tenants", json=payload, headers=super_admin_auth_headers
+        )
         assert response.status_code == 201
         data = response.json()
         assert data["tenant_id"] == "acme-corp"
@@ -71,6 +81,35 @@ async def test_tenant_onboarding_success(async_client: AsyncClient, auth_headers
         assert data["status"] == "active"
         assert data["settings"]["company_timezone"] == "America/New_York"
         assert data["settings"]["min_days_per_week"] == 4
+
+
+@pytest.mark.asyncio
+async def test_tenant_onboarding_forbidden_for_regular_admin(
+    async_client: AsyncClient, auth_headers: dict[str, str]
+):
+    payload = {
+        "tenant_id": "new-corp",
+        "name": "New Corp",
+        "contact_email": "admin@newcorp.com",
+    }
+
+    mock_admin = {
+        "admin_id": "ADM-TEST-001",
+        "username": "testadmin",
+        "role": "admin",
+        "is_active": True,
+        "tenant_id": "default",
+    }
+
+    with patch(
+        "app.repositories.admin_repo.AdminRepository.find_by_id", new_callable=AsyncMock
+    ) as mock_admin_find:
+        mock_admin_find.return_value = mock_admin
+
+        # Regular admin role="admin" should be forbidden from onboarding tenants
+        response = await async_client.post("/api/v1/tenants", json=payload, headers=auth_headers)
+        assert response.status_code == 403
+        assert "Required role: super_admin" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -86,7 +125,9 @@ async def test_tenant_onboarding_unauthorized(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_tenant_onboarding_duplicate(async_client: AsyncClient, auth_headers: dict[str, str]):
+async def test_tenant_onboarding_duplicate(
+    async_client: AsyncClient, super_admin_auth_headers: dict[str, str]
+):
     payload = {
         "tenant_id": "acme-corp",
         "name": "Acme Corporation",
@@ -94,9 +135,9 @@ async def test_tenant_onboarding_duplicate(async_client: AsyncClient, auth_heade
     }
 
     mock_admin = {
-        "admin_id": "ADM-TEST-001",
-        "username": "testadmin",
-        "role": "admin",
+        "admin_id": "ADM-SUPER-001",
+        "username": "vishrutha",
+        "role": "super_admin",
         "is_active": True,
         "tenant_id": "default",
     }
@@ -112,7 +153,9 @@ async def test_tenant_onboarding_duplicate(async_client: AsyncClient, auth_heade
         mock_admin_find.return_value = mock_admin
         mock_find.return_value = {"tenant_id": "acme-corp"}
 
-        response = await async_client.post("/api/v1/tenants", json=payload, headers=auth_headers)
+        response = await async_client.post(
+            "/api/v1/tenants", json=payload, headers=super_admin_auth_headers
+        )
         assert response.status_code == 409
         assert "already exists" in response.json()["detail"]
 

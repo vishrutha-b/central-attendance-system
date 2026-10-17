@@ -71,13 +71,17 @@ async def create_admin(
         await close_database_connection()
         return
 
+    # Only vishrutha can be super_admin
+    role = "super_admin" if username == "vishrutha" else "admin"
+
     admin_doc = {
         "tenant_id": tenant_id,
         "admin_id": str(uuid.uuid4()),
         "username": username,
         "email": email,
+        "name": "Vishrutha (Super Admin)" if username == "vishrutha" else f"{username} Admin",
         "hashed_password": hash_password(password),
-        "role": "admin",
+        "role": role,
         "is_active": True,
         "created_at": datetime.now(UTC),
     }

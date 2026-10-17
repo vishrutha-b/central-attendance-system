@@ -70,16 +70,72 @@ async def test_login_invalid_password(async_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_login_user_not_found(async_client: AsyncClient):
-    with patch(
-        "app.repositories.admin_repo.AdminRepository.find_by_username", new_callable=AsyncMock
-    ) as mock_find:
+    with (
+        patch(
+            "app.repositories.admin_repo.AdminRepository.find_by_username", new_callable=AsyncMock
+        ) as mock_find,
+        patch(
+            "app.repositories.admin_repo.AdminRepository.find_by_email", new_callable=AsyncMock
+        ) as mock_email_find,
+        patch(
+            "app.repositories.admin_repo.AdminRepository.find_super_admin", new_callable=AsyncMock
+        ) as mock_super_find,
+        patch(
+            "app.repositories.employee_repo.EmployeeRepository.find_by_id", new_callable=AsyncMock
+        ) as mock_emp_find,
+        patch(
+            "app.repositories.employee_repo.EmployeeRepository.find_by_email",
+            new_callable=AsyncMock,
+        ) as mock_emp_email_find,
+    ):
         mock_find.return_value = None
+        mock_email_find.return_value = None
+        mock_super_find.return_value = None
+        mock_emp_find.return_value = None
+        mock_emp_email_find.return_value = None
 
         response = await async_client.post(
             "/api/v1/auth/login",
             json={"username": "unknown", "password": "Password123!"},
         )
         assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_super_admin_success(async_client: AsyncClient):
+    mock_super_admin = {
+        "admin_id": "ADM-SUPER-001",
+        "username": "vishrutha",
+        "email": "vishrutha7104@gmail.com",
+        "hashed_password": hash_password("Vishu@2004"),
+        "role": "super_admin",
+        "is_active": True,
+        "tenant_id": "default",
+    }
+
+    with (
+        patch(
+            "app.repositories.admin_repo.AdminRepository.find_by_username", new_callable=AsyncMock
+        ) as mock_u_find,
+        patch(
+            "app.repositories.admin_repo.AdminRepository.find_by_email", new_callable=AsyncMock
+        ) as mock_e_find,
+        patch(
+            "app.repositories.admin_repo.AdminRepository.find_super_admin", new_callable=AsyncMock
+        ) as mock_s_find,
+    ):
+        mock_u_find.return_value = None
+        mock_e_find.return_value = None
+        mock_s_find.return_value = mock_super_admin
+
+        response = await async_client.post(
+            "/api/v1/auth/login",
+            json={"username": "vishrutha", "password": "Vishu@2004"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
 
 
 @pytest.mark.asyncio

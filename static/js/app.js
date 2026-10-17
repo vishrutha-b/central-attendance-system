@@ -662,7 +662,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (navEmployees) navEmployees.style.display = '';
         if (navAudit) navAudit.style.display = '';
-        if (navTenants) navTenants.style.display = '';
+
+        // Only platform Super Admin can view and manage Organizations/Tenants
+        const isSuperAdmin = user && user.role === 'super_admin';
+        if (navTenants) navTenants.style.display = isSuperAdmin ? '' : 'none';
+
+        if (!isSuperAdmin && this.state.currentView === 'tenants') {
+          this.switchView('dashboard');
+        }
       }
 
       // 3. Dashboard Column & Banner Views
@@ -1073,19 +1080,28 @@ document.addEventListener('DOMContentLoaded', () => {
           const tenantId = document.getElementById('tenant-id-input').value.trim();
           const name = document.getElementById('tenant-name-input').value.trim();
           const contactEmail = document.getElementById('tenant-email-input').value.trim();
-          const adminUsername = document.getElementById('tenant-admin-user')?.value.trim() || null;
-          const adminPassword = document.getElementById('tenant-admin-pwd')?.value || null;
+          const adminUsername = document.getElementById('tenant-admin-user')?.value.trim();
+          const adminPassword = document.getElementById('tenant-admin-pwd')?.value;
           const timezone = document.getElementById('tenant-tz')?.value.trim() || 'Asia/Kolkata';
           const minDays = parseInt(document.getElementById('tenant-min-days')?.value || '3', 10);
           const minHours = parseFloat(document.getElementById('tenant-min-hours')?.value || '15.0');
           const minAvg = parseFloat(document.getElementById('tenant-min-avg')?.value || '5.0');
 
+          if (!adminUsername || !adminPassword) {
+            this.showToast('warning', 'Please provide both Admin Username and Admin Password for the new organization.');
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = prevText;
+            }
+            return;
+          }
+
           const payload = {
             tenant_id: tenantId,
             name,
             contact_email: contactEmail,
-            admin_username: adminUsername || undefined,
-            admin_password: adminPassword || undefined,
+            admin_username: adminUsername,
+            admin_password: adminPassword,
             settings: {
               company_timezone: timezone,
               timezone,
@@ -1099,7 +1115,10 @@ document.addEventListener('DOMContentLoaded', () => {
           const res = await window.camsApi.onboardTenant(payload);
           this.closeModal('modal-onboard-tenant');
           document.getElementById('onboard-tenant-form').reset();
-          this.showToast('success', `Organization "${res.name}" (${res.tenant_id}) provisioned successfully!`);
+          this.showToast(
+            'success',
+            `Organization "${res.name}" (${res.tenant_id}) provisioned! Admin "${adminUsername}" can now log in for this company.`
+          );
           await this.loadTenantsView();
         } catch (err) {
           this.showToast('error', `Failed to onboard organization: ${err.message}`);

@@ -15,11 +15,13 @@ from app.api.dependencies import (
     get_current_admin,
     get_employee_repo,
     get_password_reset_repo,
+    get_tenant_repo,
 )
 from app.config import get_settings
 from app.repositories.admin_repo import AdminRepository
 from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.password_reset_repo import PasswordResetRepository
+from app.repositories.tenant_repo import TenantRepository
 from app.schemas.auth import (
     AdminRegisterRequest,
     AdminResponse,
@@ -61,8 +63,14 @@ async def login(
         employee_repo.tenant_id = data.tenant_id
         active_tenant_id = data.tenant_id
 
-    # 1. Try Administrator account
+    # 1. Try Administrator account (by username, email, or global super admin)
     admin = await admin_repo.find_by_username(username_clean)
+    if admin is None:
+        admin = await admin_repo.find_by_email(username_clean.lower())
+    if admin is None:
+        # Check if user is platform Super Admin across any tenant
+        admin = await admin_repo.find_super_admin(username_clean)
+
     if admin is not None:
         if not verify_password(data.password, admin["hashed_password"]):
             raise HTTPException(
@@ -76,20 +84,28 @@ async def login(
                 detail="Account is inactive.",
             )
 
+        token_tenant = admin.get("tenant_id") or active_tenant_id
         token, expires_in = create_access_token(
             {
                 "sub": admin["admin_id"],
                 "role": admin["role"],
                 "username": admin["username"],
-                "tenant_id": admin.get("tenant_id") or active_tenant_id,
+                "name": admin.get("name") or admin["username"],
+                "email": admin.get("email"),
+                "tenant_id": token_tenant,
             }
         )
-        logger.info("Admin '%s' logged in (tenant: %s).", admin["username"], active_tenant_id)
+        logger.info(
+            "%s '%s' logged in (tenant: %s).",
+            admin["role"].title(),
+            admin["username"],
+            token_tenant,
+        )
         return {
             "access_token": token,
             "token_type": "bearer",
             "expires_in": expires_in,
-            "tenant_id": active_tenant_id,
+            "tenant_id": token_tenant,
         }
 
     # 2. Try Employee account (by ID or Email)
@@ -156,11 +172,31 @@ async def login(
 async def register_admin(
     data: AdminRegisterRequest,
     admin_repo: AdminRepository = Depends(get_admin_repo),
+    tenant_repo: TenantRepository = Depends(get_tenant_repo),
 ) -> dict[str, Any]:
     username_clean = data.username.strip()
     active_tenant_id = data.tenant_id or admin_repo.tenant_id
     if data.tenant_id and data.tenant_id != admin_repo.tenant_id:
         admin_repo.tenant_id = data.tenant_id
+
+    # Verify that the target tenant exists (only Super Admin can onboard new tenants)
+    if active_tenant_id != "default":
+        tenant = await tenant_repo.find_by_id(active_tenant_id)
+        if tenant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"Organization '{active_tenant_id}' does not exist. "
+                    "Only Super Admin can onboard new organizations."
+                ),
+            )
+
+    # Protect super admin username
+    if username_clean.lower() == "vishrutha":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username 'vishrutha' is reserved for platform Super Admin.",
+        )
 
     existing_user = await admin_repo.find_by_username(username_clean)
     if existing_user is not None:
@@ -170,6 +206,12 @@ async def register_admin(
         )
 
     email_clean = data.email.lower().strip()
+    if email_clean == "vishrutha7104@gmail.com":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email is reserved for platform Super Admin.",
+        )
+
     existing_email = await admin_repo.find_by_email(email_clean)
     if existing_email is not None:
         raise HTTPException(

@@ -44,6 +44,15 @@ def auth_headers() -> dict[str, str]:
 
 
 @pytest.fixture
+def super_admin_auth_headers() -> dict[str, str]:
+    """Generate valid JWT Authorization header for super admin user."""
+    token, _ = create_access_token(
+        {"sub": "ADM-SUPER-001", "role": "super_admin", "username": "vishrutha"}
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
 def manager_auth_headers() -> dict[str, str]:
     """Generate valid JWT Authorization header for a manager user."""
     token, _ = create_access_token(
