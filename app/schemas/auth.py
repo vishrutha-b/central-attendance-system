@@ -62,3 +62,33 @@ class EmployeeRegisterRequest(CAMSBaseModel):
     department: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=6, max_length=128)
     tenant_id: str | None = None
+
+
+class ForgotPasswordRequest(CAMSBaseModel):
+    email: str = Field(min_length=3, max_length=150)
+    tenant_id: str | None = None
+
+
+class ForgotPasswordResponse(CAMSBaseModel):
+    message: str
+    tenant_id: str
+    dev_code: str | None = None
+
+
+class VerifyResetCodeRequest(CAMSBaseModel):
+    email: str = Field(min_length=3, max_length=150)
+    code: str = Field(min_length=4, max_length=20)
+    tenant_id: str | None = None
+
+
+class ResetPasswordRequest(CAMSBaseModel):
+    email: str = Field(min_length=3, max_length=150)
+    code: str = Field(min_length=4, max_length=20)
+    new_password: str = Field(min_length=6, max_length=128)
+    tenant_id: str | None = None
+
+
+class ResetPasswordResponse(CAMSBaseModel):
+    message: str
+    tenant_id: str
+

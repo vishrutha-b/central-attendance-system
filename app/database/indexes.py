@@ -24,6 +24,7 @@ async def create_indexes(db: Any) -> None:
     await _create_admin_indexes(db)
     await _create_regularization_indexes(db)
     await _create_leave_balance_indexes(db)
+    await _create_password_reset_indexes(db)
 
     logger.info("Multi-tenant index initialization complete.")
 
@@ -298,3 +299,21 @@ async def _create_leave_balance_indexes(db: Any) -> None:
     ]
     await collection.create_indexes(indexes)
     logger.debug("leave_balances indexes created.")
+
+
+async def _create_password_reset_indexes(db: Any) -> None:
+    collection = db.password_reset_tokens
+    indexes = [
+        IndexModel(
+            [("tenant_id", ASCENDING), ("email", ASCENDING), ("code", ASCENDING)],
+            name="idx_tenant_pwd_reset_lookup",
+        ),
+        IndexModel(
+            [("expires_at", ASCENDING)],
+            expireAfterSeconds=0,
+            name="idx_pwd_reset_ttl",
+        ),
+    ]
+    await collection.create_indexes(indexes)
+    logger.debug("password_reset_tokens indexes created.")
+

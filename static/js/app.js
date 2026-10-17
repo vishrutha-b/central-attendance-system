@@ -118,12 +118,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Dedicated Authentication Gate (Login Screen) ────────────
     initAuthGate() {
       let currentRole = 'admin'; // 'admin' or 'employee'
-      let currentMode = 'signin'; // 'signin' or 'register'
+      let currentMode = 'signin'; // 'signin', 'register', or 'forgot'
+
+      // Check URL parameters for tenant scoping (e.g. ?tenant=acme-corp)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlTenant = urlParams.get('tenant') || (window.location.hash.startsWith('#tenant=') ? window.location.hash.split('=')[1] : null);
+      let activeTenantSlug = (urlTenant && urlTenant.trim()) ? urlTenant.trim() : (window.camsApi.getTenantId() || 'default');
 
       const tabAdmin = document.getElementById('auth-tab-admin');
       const tabEmployee = document.getElementById('auth-tab-employee');
       const modeSignin = document.getElementById('auth-mode-signin');
       const modeRegister = document.getElementById('auth-mode-register');
+      const modeForgot = document.getElementById('auth-mode-forgot');
       const labelUser = document.getElementById('auth-label-username');
       const descText = document.getElementById('auth-role-description');
       const userInput = document.getElementById('auth-input-username');
@@ -132,11 +138,67 @@ document.addEventListener('DOMContentLoaded', () => {
       const errorBox = document.getElementById('auth-error-message');
       const loginForm = document.getElementById('auth-login-form');
       const registerForm = document.getElementById('auth-register-form');
+      const forgotForm = document.getElementById('auth-forgot-form');
       const regAdminFields = document.getElementById('auth-reg-admin-fields');
       const regEmployeeFields = document.getElementById('auth-reg-employee-fields');
       const regSubmitBtn = document.getElementById('auth-btn-reg-submit');
       const switchToReg = document.getElementById('auth-switch-to-register');
       const switchToSign = document.getElementById('auth-switch-to-signin');
+      const linkForgot = document.getElementById('auth-link-forgot');
+      const switchFromForgot = document.getElementById('auth-switch-to-signin-from-forgot');
+
+      const tenantBadge = document.getElementById('auth-tenant-badge');
+      const tenantBadgeName = document.getElementById('auth-tenant-badge-name');
+      const tenantChangeBtn = document.getElementById('auth-tenant-change-btn');
+      const mainTitle = document.getElementById('auth-main-title');
+      const mainSubtitle = document.getElementById('auth-main-subtitle');
+
+      const loginTenantInput = document.getElementById('auth-input-tenant');
+      const regTenantInput = document.getElementById('auth-reg-tenant-id');
+      const forgotTenantInput = document.getElementById('auth-forgot-tenant-id');
+
+      // Step elements for forgot password
+      const forgotStep1 = document.getElementById('auth-forgot-step-1');
+      const forgotStep2 = document.getElementById('auth-forgot-step-2');
+      const btnSendCode = document.getElementById('auth-btn-send-code');
+      const btnResendCode = document.getElementById('auth-btn-resend-code');
+      const forgotNotice = document.getElementById('auth-forgot-code-notice');
+
+      // Apply initial tenant configuration
+      const applyTenantBranding = (slug) => {
+        activeTenantSlug = slug || 'default';
+        window.camsApi.setTenantId(activeTenantSlug);
+
+        if (loginTenantInput) loginTenantInput.value = activeTenantSlug;
+        if (regTenantInput) regTenantInput.value = activeTenantSlug;
+        if (forgotTenantInput) forgotTenantInput.value = activeTenantSlug;
+
+        if (activeTenantSlug && activeTenantSlug !== 'default') {
+          if (tenantBadge) tenantBadge.style.display = 'flex';
+          if (tenantBadgeName) tenantBadgeName.textContent = activeTenantSlug;
+          if (mainTitle) mainTitle.textContent = `${activeTenantSlug.toUpperCase()} Portal`;
+          if (mainSubtitle) mainSubtitle.textContent = `Attendance & Compliance for ${activeTenantSlug}`;
+          document.getElementById('auth-group-login-tenant')?.style.setProperty('display', 'none');
+          document.getElementById('auth-group-reg-tenant')?.style.setProperty('display', 'none');
+          document.getElementById('auth-group-forgot-tenant')?.style.setProperty('display', 'none');
+        } else {
+          if (tenantBadge) tenantBadge.style.display = 'none';
+          if (mainTitle) mainTitle.textContent = 'CAMS Portal';
+          if (mainSubtitle) mainSubtitle.textContent = 'Central Attendance & Compliance System';
+          document.getElementById('auth-group-login-tenant')?.style.removeProperty('display');
+          document.getElementById('auth-group-reg-tenant')?.style.removeProperty('display');
+          document.getElementById('auth-group-forgot-tenant')?.style.removeProperty('display');
+        }
+      };
+
+      tenantChangeBtn?.addEventListener('click', () => {
+        const newSlug = prompt('Enter Organization ID to switch to:', activeTenantSlug);
+        if (newSlug !== null) {
+          applyTenantBranding(newSlug.trim().toLowerCase());
+        }
+      });
+
+      applyTenantBranding(activeTenantSlug);
 
       const updateUI = () => {
         if (errorBox) errorBox.classList.remove('visible');
@@ -162,10 +224,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (regSubmitBtn) regSubmitBtn.textContent = 'Create Employee Account →';
         }
 
-        // Mode switch
+        // Mode switch: signin, register, forgot
         if (currentMode === 'signin') {
           modeSignin?.classList.add('active');
           modeRegister?.classList.remove('active');
+          modeForgot?.classList.remove('active');
+          if (modeForgot) modeForgot.style.display = 'none';
+
           if (modeSignin) {
             modeSignin.style.color = 'var(--primary)';
             modeSignin.style.borderBottomColor = 'var(--primary)';
@@ -174,16 +239,22 @@ document.addEventListener('DOMContentLoaded', () => {
             modeRegister.style.color = 'var(--text-muted)';
             modeRegister.style.borderBottomColor = 'transparent';
           }
+
           if (loginForm) loginForm.style.display = 'flex';
           if (registerForm) registerForm.style.display = 'none';
+          if (forgotForm) forgotForm.style.display = 'none';
+
           if (descText) {
             descText.innerHTML = currentRole === 'admin'
               ? '<strong>Administrator Sign In:</strong> Enter your admin username and password to log in.'
               : '<strong>Employee Sign In:</strong> Enter your Employee ID (or email) and your password to log in.';
           }
-        } else {
+        } else if (currentMode === 'register') {
           modeRegister?.classList.add('active');
           modeSignin?.classList.remove('active');
+          modeForgot?.classList.remove('active');
+          if (modeForgot) modeForgot.style.display = 'none';
+
           if (modeRegister) {
             modeRegister.style.color = 'var(--primary)';
             modeRegister.style.borderBottomColor = 'var(--primary)';
@@ -192,12 +263,40 @@ document.addEventListener('DOMContentLoaded', () => {
             modeSignin.style.color = 'var(--text-muted)';
             modeSignin.style.borderBottomColor = 'transparent';
           }
+
           if (loginForm) loginForm.style.display = 'none';
           if (registerForm) registerForm.style.display = 'flex';
+          if (forgotForm) forgotForm.style.display = 'none';
+
           if (descText) {
             descText.innerHTML = currentRole === 'admin'
               ? '<strong>Create Administrator Account:</strong> Register your admin username and choose your password.'
               : '<strong>Create Employee Account:</strong> Register your employee profile and set your personal password.';
+          }
+        } else if (currentMode === 'forgot') {
+          modeForgot?.classList.add('active');
+          modeSignin?.classList.remove('active');
+          modeRegister?.classList.remove('active');
+          if (modeForgot) {
+            modeForgot.style.display = 'inline-block';
+            modeForgot.style.color = 'var(--primary)';
+            modeForgot.style.borderBottomColor = 'var(--primary)';
+          }
+          if (modeSignin) {
+            modeSignin.style.color = 'var(--text-muted)';
+            modeSignin.style.borderBottomColor = 'transparent';
+          }
+          if (modeRegister) {
+            modeRegister.style.color = 'var(--text-muted)';
+            modeRegister.style.borderBottomColor = 'transparent';
+          }
+
+          if (loginForm) loginForm.style.display = 'none';
+          if (registerForm) registerForm.style.display = 'none';
+          if (forgotForm) forgotForm.style.display = 'flex';
+
+          if (descText) {
+            descText.innerHTML = '<strong>Account Recovery:</strong> Request a 6-digit verification code by email to change your password.';
           }
         }
       };
@@ -208,6 +307,8 @@ document.addEventListener('DOMContentLoaded', () => {
       modeRegister?.addEventListener('click', () => { currentMode = 'register'; updateUI(); });
       switchToReg?.addEventListener('click', (e) => { e.preventDefault(); currentMode = 'register'; updateUI(); });
       switchToSign?.addEventListener('click', (e) => { e.preventDefault(); currentMode = 'signin'; updateUI(); });
+      linkForgot?.addEventListener('click', (e) => { e.preventDefault(); currentMode = 'forgot'; updateUI(); });
+      switchFromForgot?.addEventListener('click', (e) => { e.preventDefault(); currentMode = 'signin'; updateUI(); });
 
       // Initial clean state
       updateUI();
@@ -216,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
       loginForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const tenantInput = document.getElementById('auth-input-tenant');
-        const tenantId = tenantInput?.value.trim() || 'default';
+        const tenantId = (tenantInput?.value.trim()) || activeTenantSlug || 'default';
         const username = userInput?.value.trim() || '';
         const password = passInput?.value || '';
 
@@ -268,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Register Form Handler
       registerForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const tenantId = document.getElementById('auth-reg-tenant-id')?.value.trim() || 'default';
+        const tenantId = document.getElementById('auth-reg-tenant-id')?.value.trim() || activeTenantSlug || 'default';
         const email = document.getElementById('auth-reg-email')?.value.trim();
         const password = document.getElementById('auth-reg-password')?.value;
         const confirmPassword = document.getElementById('auth-reg-confirm-password')?.value;
@@ -338,6 +439,135 @@ document.addEventListener('DOMContentLoaded', () => {
           if (regSubmitBtn) {
             regSubmitBtn.disabled = false;
             regSubmitBtn.textContent = prevBtnText;
+          }
+        }
+      });
+
+      // ── Forgot Password Step 1: Request Code Handler ────────────
+      btnSendCode?.addEventListener('click', async () => {
+        const email = document.getElementById('auth-forgot-email')?.value.trim();
+        const tenantId = document.getElementById('auth-forgot-tenant-id')?.value.trim() || activeTenantSlug || 'default';
+
+        if (!email) {
+          if (errorBox) {
+            errorBox.textContent = 'Please enter your registered work email address.';
+            errorBox.classList.add('visible');
+          }
+          return;
+        }
+
+        const prevText = btnSendCode.textContent;
+        btnSendCode.disabled = true;
+        btnSendCode.textContent = 'Sending code...';
+        if (errorBox) errorBox.classList.remove('visible');
+
+        try {
+          const res = await window.camsApi.forgotPassword(email, tenantId);
+          if (forgotStep1) forgotStep1.style.display = 'none';
+          if (forgotStep2) forgotStep2.style.display = 'flex';
+
+          if (forgotNotice) {
+            if (res.dev_code) {
+              forgotNotice.innerHTML = `Verification code sent to <strong>${email}</strong>!<br><span style="font-size:0.75rem;">(Testing Code: <strong>${res.dev_code}</strong>)</span>`;
+            } else {
+              forgotNotice.innerHTML = `Verification code sent to <strong>${email}</strong>! Please check your inbox.`;
+            }
+          }
+          this.showToast('info', 'Verification code sent to your email.');
+        } catch (err) {
+          if (errorBox) {
+            errorBox.textContent = `Failed to send code: ${err.message}`;
+            errorBox.classList.add('visible');
+          }
+        } finally {
+          btnSendCode.disabled = false;
+          btnSendCode.textContent = prevText;
+        }
+      });
+
+      // Resend Code
+      btnResendCode?.addEventListener('click', async () => {
+        const email = document.getElementById('auth-forgot-email')?.value.trim();
+        const tenantId = document.getElementById('auth-forgot-tenant-id')?.value.trim() || activeTenantSlug || 'default';
+        if (!email) return;
+
+        try {
+          const res = await window.camsApi.forgotPassword(email, tenantId);
+          if (forgotNotice && res.dev_code) {
+            forgotNotice.innerHTML = `New verification code sent!<br><span style="font-size:0.75rem;">(Testing Code: <strong>${res.dev_code}</strong>)</span>`;
+          }
+          this.showToast('info', 'New verification code sent to your email.');
+        } catch (err) {
+          this.showToast('error', err.message);
+        }
+      });
+
+      // ── Forgot Password Step 2: Verify & Reset Handler ──────────
+      forgotForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('auth-forgot-email')?.value.trim();
+        const code = document.getElementById('auth-reset-code')?.value.trim();
+        const newPassword = document.getElementById('auth-reset-new-password')?.value;
+        const confirmPassword = document.getElementById('auth-reset-confirm-password')?.value;
+        const tenantId = document.getElementById('auth-forgot-tenant-id')?.value.trim() || activeTenantSlug || 'default';
+
+        if (!code) {
+          if (errorBox) {
+            errorBox.textContent = 'Please enter the 6-digit verification code from your email.';
+            errorBox.classList.add('visible');
+          }
+          return;
+        }
+
+        if (newPassword !== confirmPassword) {
+          if (errorBox) {
+            errorBox.textContent = 'Passwords do not match. Please verify.';
+            errorBox.classList.add('visible');
+          }
+          return;
+        }
+
+        if (newPassword.length < 6) {
+          if (errorBox) {
+            errorBox.textContent = 'New password must be at least 6 characters long.';
+            errorBox.classList.add('visible');
+          }
+          return;
+        }
+
+        const resetSubmitBtn = document.getElementById('auth-btn-reset-submit');
+        const prevText = resetSubmitBtn ? resetSubmitBtn.textContent : '';
+        if (resetSubmitBtn) {
+          resetSubmitBtn.disabled = true;
+          resetSubmitBtn.textContent = 'Updating password...';
+        }
+        if (errorBox) errorBox.classList.remove('visible');
+
+        try {
+          await window.camsApi.resetPassword(email, code, newPassword, tenantId);
+          this.showToast('success', 'Password reset successfully! Please sign in with your new password.');
+
+          // Switch back to sign in
+          currentMode = 'signin';
+          updateUI();
+
+          // Pre-fill username field with email for easy login
+          if (userInput) userInput.value = email;
+          if (passInput) passInput.value = '';
+
+          // Reset forgot form state
+          forgotForm.reset();
+          if (forgotStep1) forgotStep1.style.display = 'flex';
+          if (forgotStep2) forgotStep2.style.display = 'none';
+        } catch (err) {
+          if (errorBox) {
+            errorBox.textContent = `Password reset failed: ${err.message}`;
+            errorBox.classList.add('visible');
+          }
+        } finally {
+          if (resetSubmitBtn) {
+            resetSubmitBtn.disabled = false;
+            resetSubmitBtn.textContent = prevText;
           }
         }
       });

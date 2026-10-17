@@ -3,24 +3,38 @@
 from __future__ import annotations
 
 import logging
+import secrets
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.dependencies import get_admin_repo, get_current_admin, get_employee_repo
+from app.api.dependencies import (
+    get_admin_repo,
+    get_current_admin,
+    get_employee_repo,
+    get_password_reset_repo,
+)
+from app.config import get_settings
 from app.repositories.admin_repo import AdminRepository
 from app.repositories.employee_repo import EmployeeRepository
+from app.repositories.password_reset_repo import PasswordResetRepository
 from app.schemas.auth import (
     AdminRegisterRequest,
     AdminResponse,
     EmployeeRegisterRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     TokenResponse,
+    VerifyResetCodeRequest,
 )
 from app.security.auth import create_access_token
 from app.security.password import hash_password, verify_password
+from app.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -294,3 +308,179 @@ async def get_me(
     # Remove sensitive fields before returning
     safe = {k: v for k, v in current_admin.items() if k != "hashed_password"}
     return safe
+
+
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    summary="Request password reset verification code",
+    description="Sends an email with a 6-digit verification code to reset account password.",
+    status_code=status.HTTP_200_OK,
+)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    admin_repo: AdminRepository = Depends(get_admin_repo),
+    employee_repo: EmployeeRepository = Depends(get_employee_repo),
+    reset_repo: PasswordResetRepository = Depends(get_password_reset_repo),
+) -> dict[str, Any]:
+    active_tenant_id = data.tenant_id or admin_repo.tenant_id
+    if data.tenant_id and data.tenant_id != admin_repo.tenant_id:
+        admin_repo.tenant_id = data.tenant_id
+        employee_repo.tenant_id = data.tenant_id
+        reset_repo.tenant_id = data.tenant_id
+
+    email_clean = data.email.lower().strip()
+
+    # Search in admin accounts first
+    user_id = None
+    user_type = None
+    user_name = "User"
+
+    admin = await admin_repo.find_by_email(email_clean)
+    if admin is not None:
+        user_id = admin["admin_id"]
+        user_type = "admin"
+        user_name = admin.get("name") or admin["username"]
+    else:
+        # Search in employee accounts
+        emp = await employee_repo.find_by_email(email_clean)
+        if emp is not None:
+            user_id = emp["employee_id"]
+            user_type = "employee"
+            user_name = emp.get("name") or emp["employee_id"]
+
+    if not user_id or not user_type:
+        # For security, return generic success message to prevent user enumeration
+        return {
+            "message": "If an account exists with that email, a verification code has been sent.",
+            "tenant_id": active_tenant_id,
+        }
+
+    # Generate 6-digit numeric verification code
+    code = f"{secrets.randbelow(900000) + 100000}"
+    await reset_repo.create_reset_token(
+        user_id=user_id,
+        user_type=user_type,
+        email=email_clean,
+        code=code,
+        expires_in_minutes=15,
+    )
+
+    # Send verification email
+    notification_svc = NotificationService()
+    await notification_svc.send_password_reset_email(
+        to_email=email_clean,
+        user_name=user_name,
+        reset_code=code,
+        tenant_id=active_tenant_id,
+    )
+
+    settings = get_settings()
+    dev_code = code if settings.app_env != "production" else None
+
+    logger.info(
+        "Password reset initiated for %s [%s] in tenant '%s'.",
+        email_clean,
+        user_type,
+        active_tenant_id,
+    )
+    return {
+        "message": f"Verification code sent to {email_clean}.",
+        "tenant_id": active_tenant_id,
+        "dev_code": dev_code,
+    }
+
+
+@router.post(
+    "/verify-reset-code",
+    summary="Verify reset code",
+    description="Validates that a password reset code is valid and unexpired.",
+    status_code=status.HTTP_200_OK,
+)
+async def verify_reset_code(
+    data: VerifyResetCodeRequest,
+    reset_repo: PasswordResetRepository = Depends(get_password_reset_repo),
+) -> dict[str, Any]:
+    active_tenant_id = data.tenant_id or reset_repo.tenant_id
+    if data.tenant_id and data.tenant_id != reset_repo.tenant_id:
+        reset_repo.tenant_id = data.tenant_id
+
+    token = await reset_repo.find_valid_token(data.email, data.code)
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code.",
+        )
+
+    return {
+        "valid": True,
+        "message": "Verification code is valid.",
+        "tenant_id": active_tenant_id,
+    }
+
+
+@router.post(
+    "/reset-password",
+    response_model=ResetPasswordResponse,
+    summary="Change password using verified reset code",
+    description="Updates account password using a valid email verification code.",
+    status_code=status.HTTP_200_OK,
+)
+async def reset_password(
+    data: ResetPasswordRequest,
+    admin_repo: AdminRepository = Depends(get_admin_repo),
+    employee_repo: EmployeeRepository = Depends(get_employee_repo),
+    reset_repo: PasswordResetRepository = Depends(get_password_reset_repo),
+) -> dict[str, Any]:
+    active_tenant_id = data.tenant_id or reset_repo.tenant_id
+    if data.tenant_id and data.tenant_id != reset_repo.tenant_id:
+        admin_repo.tenant_id = data.tenant_id
+        employee_repo.tenant_id = data.tenant_id
+        reset_repo.tenant_id = data.tenant_id
+
+    token = await reset_repo.find_valid_token(data.email, data.code)
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code.",
+        )
+
+    new_hash = hash_password(data.new_password)
+    email_clean = data.email.lower().strip()
+    user_type = token.get("user_type")
+    user_id = token.get("user_id")
+
+    if user_type == "admin":
+        updated = await admin_repo.update_password(email_clean, new_hash)
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Admin account not found.",
+            )
+    else:
+        # employee
+        if not user_id:
+            emp = await employee_repo.find_by_email(email_clean)
+            user_id = emp["employee_id"] if emp else None
+
+        if user_id:
+            await employee_repo.update(user_id, {"hashed_password": new_hash})
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Employee account not found.",
+            )
+
+    # Invalidate token
+    await reset_repo.mark_used(email_clean, data.code)
+    logger.info(
+        "Password successfully reset for %s [%s] in tenant '%s'.",
+        email_clean,
+        user_type,
+        active_tenant_id,
+    )
+    return {
+        "message": "Password successfully reset. You may now sign in.",
+        "tenant_id": active_tenant_id,
+    }
+

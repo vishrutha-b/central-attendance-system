@@ -62,6 +62,14 @@ class AdminRepository:
     async def count(self) -> int:
         return await self.col.count_documents({"tenant_id": self.tenant_id})
 
+    async def update_password(self, email: str, hashed_password: str) -> bool:
+        res = await self.col.update_one(
+            {"tenant_id": self.tenant_id, "email": email.lower().strip()},
+            {"$set": {"hashed_password": hashed_password, "updated_at": datetime.now(tz=UTC)}},
+        )
+        return res.modified_count > 0
+
+
 
 class AuditRepository:
     def __init__(self, db: Any, tenant_id: str = "default") -> None:

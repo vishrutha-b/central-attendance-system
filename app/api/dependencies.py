@@ -19,6 +19,7 @@ from app.repositories.attendance_repo import AttendanceRepository
 from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.leave_balance_repo import LeaveBalanceRepository
 from app.repositories.leave_repo import HolidayRepository, LeaveRepository
+from app.repositories.password_reset_repo import PasswordResetRepository
 from app.repositories.regularization_repo import RegularizationRepository
 from app.repositories.tenant_repo import TenantRepository
 from app.security.auth import decode_access_token
@@ -137,6 +138,14 @@ def get_leave_balance_repo(
     tenant_id: str = Depends(get_current_tenant_id),
 ) -> LeaveBalanceRepository:
     return LeaveBalanceRepository(db, tenant_id=tenant_id)
+
+
+def get_password_reset_repo(
+    db: Any = Depends(get_database),
+    tenant_id: str = Depends(get_current_tenant_id),
+) -> PasswordResetRepository:
+    return PasswordResetRepository(db, tenant_id=tenant_id)
+
 
 
 # ── Service factories ─────────────────────────────────────────────────────────

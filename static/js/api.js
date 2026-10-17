@@ -227,6 +227,30 @@ class CamsApiClient {
     return this.request('/api/v1/auth/me');
   }
 
+  async forgotPassword(email, tenantId = null) {
+    const activeTenant = tenantId || this.getTenantId();
+    return this.request('/api/v1/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, tenant_id: activeTenant }),
+    });
+  }
+
+  async verifyResetCode(email, code, tenantId = null) {
+    const activeTenant = tenantId || this.getTenantId();
+    return this.request('/api/v1/auth/verify-reset-code', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, tenant_id: activeTenant }),
+    });
+  }
+
+  async resetPassword(email, code, newPassword, tenantId = null) {
+    const activeTenant = tenantId || this.getTenantId();
+    return this.request('/api/v1/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, new_password: newPassword, tenant_id: activeTenant }),
+    });
+  }
+
   logout() {
     this.setToken(null);
     this.setCurrentUser(null);

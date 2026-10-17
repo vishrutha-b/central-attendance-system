@@ -25,9 +25,18 @@
       <div class="auth-brand-block">
         <div class="auth-brand-icon">C</div>
         <div>
-          <h1 class="auth-title">CAMS Portal</h1>
-          <p class="auth-subtitle">Central Attendance & Compliance System</p>
+          <h1 class="auth-title" id="auth-main-title">CAMS Portal</h1>
+          <p class="auth-subtitle" id="auth-main-subtitle">Central Attendance & Compliance System</p>
         </div>
+      </div>
+
+      <!-- Active Tenant Badge / Switcher (Auto-locked when ?tenant=slug or selected) -->
+      <div id="auth-tenant-badge" style="display: none; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.85rem; align-items: center; justify-content: space-between; font-size: 0.82rem; color: var(--primary);">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span>🏢</span>
+          <span>Organization: <strong id="auth-tenant-badge-name">default</strong></span>
+        </div>
+        <button type="button" id="auth-tenant-change-btn" style="background: none; border: none; color: var(--primary); font-size: 0.75rem; text-decoration: underline; cursor: pointer; font-weight: 600;">Switch</button>
       </div>
 
       <!-- Segmented Role Selector -->
@@ -40,13 +49,16 @@
         </button>
       </div>
 
-      <!-- Sign In vs Register Mode Switcher -->
-      <div style="display: flex; justify-content: center; gap: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.65rem;">
+      <!-- Sign In vs Register vs Forgot Mode Switcher -->
+      <div style="display: flex; justify-content: center; gap: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.65rem;">
         <button type="button" class="auth-mode-link active" id="auth-mode-signin" style="background: none; border: none; font-size: 0.86rem; font-weight: 600; color: var(--primary); cursor: pointer; border-bottom: 2px solid var(--primary); padding-bottom: 4px;">
           Sign In
         </button>
         <button type="button" class="auth-mode-link" id="auth-mode-register" style="background: none; border: none; font-size: 0.86rem; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; padding-bottom: 4px;">
-          Create Account / Set Password
+          Sign Up
+        </button>
+        <button type="button" class="auth-mode-link" id="auth-mode-forgot" style="display: none; background: none; border: none; font-size: 0.86rem; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; padding-bottom: 4px;">
+          Reset Password
         </button>
       </div>
 
@@ -60,7 +72,7 @@
 
       <!-- ── FORM 1: SIGN IN ────────────────────────────────────────────────── -->
       <form id="auth-login-form" class="auth-form">
-        <div class="form-group">
+        <div class="form-group" id="auth-group-login-tenant">
           <label class="form-label" for="auth-input-tenant">
             <span>Organization ID</span>
             <span style="font-size: 0.72rem; color: var(--text-muted);">(e.g. 'default', 'acme-corp')</span>
@@ -80,6 +92,12 @@
             <span>Password</span>
           </label>
           <input type="password" class="form-control" id="auth-input-password" placeholder="Enter your password" required>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: -0.25rem;">
+          <a href="#" id="auth-link-forgot" style="font-size: 0.8rem; color: var(--primary); text-decoration: none;">
+            Forgot password? Reset here →
+          </a>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block" id="auth-btn-submit" style="padding: 0.75rem;">
@@ -133,7 +151,7 @@
           </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="auth-group-reg-tenant">
           <label class="form-label" for="auth-reg-tenant-id">
             <span>Organization ID</span>
             <span style="font-size: 0.72rem; color: var(--text-muted);">(e.g. 'default', 'acme-corp')</span>
@@ -165,6 +183,65 @@
         <div style="text-align: center; margin-top: 0.25rem;">
           <a href="#" id="auth-switch-to-signin" style="font-size: 0.82rem; color: var(--primary); text-decoration: none;">
             Already have an account? Sign in →
+          </a>
+        </div>
+      </form>
+
+      <!-- ── FORM 3: FORGOT / RESET PASSWORD ─────────────────────────────────── -->
+      <form id="auth-forgot-form" class="auth-form" style="display: none;">
+        <!-- Step 1: Request Verification Code -->
+        <div id="auth-forgot-step-1" style="display: flex; flex-direction: column; gap: 0.85rem;">
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.4;">
+            Enter your registered work email and Organization ID. We will send a secure 6-digit verification code to reset your password.
+          </p>
+          <div class="form-group" id="auth-group-forgot-tenant">
+            <label class="form-label" for="auth-forgot-tenant-id">
+              <span>Organization ID</span>
+            </label>
+            <input type="text" class="form-control" id="auth-forgot-tenant-id" placeholder="default" value="default" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="auth-forgot-email">Registered Work Email</label>
+            <input type="email" class="form-control" id="auth-forgot-email" placeholder="name@company.com" required>
+          </div>
+          <button type="button" class="btn btn-primary btn-block" id="auth-btn-send-code" style="padding: 0.75rem;">
+            Send Verification Code →
+          </button>
+        </div>
+
+        <!-- Step 2: Verify Code & Change Password -->
+        <div id="auth-forgot-step-2" style="display: none; flex-direction: column; gap: 0.85rem;">
+          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--success);" id="auth-forgot-code-notice">
+            Verification code sent! Please check your inbox.
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="auth-reset-code">
+              <span>6-Digit Verification Code</span>
+              <span style="font-size: 0.72rem; color: var(--text-muted);">(from email)</span>
+            </label>
+            <input type="text" class="form-control" id="auth-reset-code" placeholder="e.g. 123456" maxlength="10" required style="letter-spacing: 2px; font-weight: 700;">
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="auth-reset-new-password">New Password</label>
+              <input type="password" class="form-control" id="auth-reset-new-password" placeholder="Min 6 chars" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="auth-reset-confirm-password">Confirm Password</label>
+              <input type="password" class="form-control" id="auth-reset-confirm-password" placeholder="Repeat password" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="auth-btn-reset-submit" style="padding: 0.75rem;">
+            Verify Code & Change Password →
+          </button>
+          <button type="button" class="btn btn-secondary btn-block" id="auth-btn-resend-code" style="font-size: 0.8rem; padding: 0.4rem;">
+            Resend Code
+          </button>
+        </div>
+
+        <div style="text-align: center; margin-top: 0.5rem;">
+          <a href="#" id="auth-switch-to-signin-from-forgot" style="font-size: 0.82rem; color: var(--primary); text-decoration: none;">
+            ← Back to Sign In
           </a>
         </div>
       </form>

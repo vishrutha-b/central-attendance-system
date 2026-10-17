@@ -137,6 +137,60 @@ class NotificationService:
 
         return await _send_via_smtp(employee_email, subject, body, settings, html_body=html_body)
 
+    async def send_password_reset_email(
+        self,
+        to_email: str,
+        user_name: str,
+        reset_code: str,
+        tenant_id: str,
+    ) -> bool:
+        """Send a password reset verification code email."""
+        settings = get_settings()
+        mode = settings.email_delivery_mode
+        subject = f"Password Reset Code: {reset_code} — CAMS ({tenant_id})"
+        body = (
+            f"Hello {user_name},\n\n"
+            f"You requested to reset your password for organization '{tenant_id}'.\n\n"
+            f"Your verification code is: {reset_code}\n\n"
+            f"This code will expire in 15 minutes.\n\n"
+            f"If you did not request this, please ignore this email.\n\n"
+            f"— CAMS Security Team\n"
+        )
+        html_body = (
+            "<div style='font-family:sans-serif; max-width:500px; margin:auto; "
+            "padding:20px; border:1px solid #e2e8f0; border-radius:8px;'>"
+            "<h2 style='color:#4f46e5; margin-bottom:10px;'>Password Reset</h2>"
+            f"<p>Hello <strong>{user_name}</strong>,</p>"
+            f"<p>We received a password reset request for <code>{tenant_id}</code>.</p>"
+            "<div style='background:#f1f5f9; padding:15px; border-radius:6px; "
+            "text-align:center; margin:20px 0;'>"
+            f"<span style='font-size:24px; font-weight:700; letter-spacing:4px; "
+            f"color:#1e293b;'>{reset_code}</span>"
+            "</div>"
+            "<p style='color:#64748b; font-size:13px;'>"
+            "This code expires in 15 minutes. Enter this code to set your new password.</p>"
+            "<hr style='border:none; border-top:1px solid #e2e8f0; margin:20px 0;'>"
+            "<p style='color:#94a3b8; font-size:11px;'>"
+            "If you did not request this, you can safely ignore this email.</p>"
+            "</div>"
+        )
+
+        if mode == "disabled":
+            logger.info("Email delivery disabled. Reset code for %s: %s", to_email, reset_code)
+            return True
+
+        if mode == "console":
+            logger.info(
+                "=== [CONSOLE EMAIL] To: %s | Subject: %s ===\n%s\n=== END EMAIL ===",
+                to_email,
+                subject,
+                body,
+            )
+            return True
+
+        return await _send_via_smtp(to_email, subject, body, settings, html_body=html_body)
+
+
 
 async def _send_via_smtp(
     to_address: str,
