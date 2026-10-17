@@ -6,7 +6,7 @@ import logging
 import math
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.dependencies import get_current_admin, get_employee_service, require_admin
 from app.schemas.employee import (
@@ -39,7 +39,10 @@ async def create_employee(
 @router.get(
     "",
     summary="List employees",
-    description="List all employees with optional filtering and pagination.",
+    description=(
+        "List employees with optional filtering and pagination. "
+        "Admin sees whole company; employee sees only their own profile."
+    ),
 )
 async def list_employees(
     page: int = Query(default=1, ge=1),
@@ -50,6 +53,19 @@ async def list_employees(
     service: EmployeeService = Depends(get_employee_service),
     current_admin: dict[str, Any] = Depends(get_current_admin),
 ) -> dict[str, Any]:
+    if current_admin.get("role") == "employee":
+        user_emp_id = (
+            current_admin.get("employee_id") or current_admin.get("admin_id") or ""
+        ).upper()
+        emp = await service.get_employee(user_emp_id) if user_emp_id else None
+        return {
+            "items": [emp] if emp else [],
+            "total": 1 if emp else 0,
+            "page": 1,
+            "page_size": page_size,
+            "total_pages": 1,
+        }
+
     params = EmployeeListParams(
         page=page,
         page_size=page_size,
@@ -79,6 +95,16 @@ async def get_employee(
     service: EmployeeService = Depends(get_employee_service),
     current_admin: dict[str, Any] = Depends(get_current_admin),
 ) -> dict[str, Any]:
+    if current_admin.get("role") == "employee":
+        user_emp_id = (
+            current_admin.get("employee_id") or current_admin.get("admin_id") or ""
+        ).upper()
+        if employee_id.upper() != user_emp_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Employees can only access their own profile data.",
+            )
+
     return await service.get_employee(employee_id)
 
 

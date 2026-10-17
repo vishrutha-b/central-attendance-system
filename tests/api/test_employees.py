@@ -145,5 +145,71 @@ async def test_get_employee_not_found(async_client: AsyncClient, auth_headers: d
         mock_admin_find.return_value = mock_admin
         mock_find.return_value = None
 
-        response = await async_client.get("/api/v1/employees/EMP-NONEXISTENT", headers=auth_headers)
+        response = await async_client.get(
+            "/api/v1/employees/EMP-NONEXISTENT", headers=auth_headers
+        )
         assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_employees_for_employee_returns_only_self(
+    async_client: AsyncClient, employee_auth_headers: dict[str, str]
+):
+    now = datetime.now(UTC)
+    mock_emp = {
+        "employee_id": "EMP-001",
+        "name": "Self Employee",
+        "email": "self@company.com",
+        "department": "Engineering",
+        "role": "Engineer",
+        "is_active": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    with (
+        patch(
+            "app.repositories.employee_repo.EmployeeRepository.find_by_id", new_callable=AsyncMock
+        ) as mock_find,
+        patch(
+            "app.services.employee_service.EmployeeService.get_employee", new_callable=AsyncMock
+        ) as mock_get_emp,
+    ):
+        mock_find.return_value = mock_emp
+        mock_get_emp.return_value = mock_emp
+
+        response = await async_client.get("/api/v1/employees", headers=employee_auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["employee_id"] == "EMP-001"
+
+
+@pytest.mark.asyncio
+async def test_get_other_employee_forbidden_for_employee(
+    async_client: AsyncClient, employee_auth_headers: dict[str, str]
+):
+    now = datetime.now(UTC)
+    mock_emp = {
+        "employee_id": "EMP-001",
+        "name": "Self Employee",
+        "email": "self@company.com",
+        "department": "Engineering",
+        "role": "Engineer",
+        "is_active": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    with patch(
+        "app.repositories.employee_repo.EmployeeRepository.find_by_id", new_callable=AsyncMock
+    ) as mock_find:
+        mock_find.return_value = mock_emp
+
+        # Trying to access EMP-002 with EMP-001 token -> 403 Forbidden
+        response = await async_client.get(
+            "/api/v1/employees/EMP-002", headers=employee_auth_headers
+        )
+        assert response.status_code == 403
+        assert "Employees can only access their own profile data" in response.json()["detail"]

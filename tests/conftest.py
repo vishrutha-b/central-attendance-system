@@ -61,6 +61,21 @@ def manager_auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+@pytest.fixture
+def employee_auth_headers() -> dict[str, str]:
+    """Generate valid JWT Authorization header for an employee user."""
+    token, _ = create_access_token(
+        {
+            "sub": "EMP-001",
+            "role": "employee",
+            "username": "EMP-001",
+            "employee_id": "EMP-001",
+            "tenant_id": "default",
+        }
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
 @pytest.fixture(autouse=True)
 def mock_db_dependency():
     """Automatically mock database connection dependency."""
