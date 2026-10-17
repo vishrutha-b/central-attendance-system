@@ -1,4 +1,4 @@
-"""Authentication schemas."""
+"""Authentication schemas with multi-tenant support."""
 
 from __future__ import annotations
 
@@ -15,12 +15,14 @@ AdminRole = Literal["super_admin", "admin", "manager", "employee"]
 class LoginRequest(CAMSBaseModel):
     username: str = Field(min_length=1)
     password: str = Field(min_length=1)
+    tenant_id: str | None = Field(default=None, description="Optional tenant identifier")
 
 
 class TokenResponse(CAMSBaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int  # seconds
+    tenant_id: str = "default"
 
 
 class AdminResponse(CAMSBaseModel):
@@ -29,6 +31,7 @@ class AdminResponse(CAMSBaseModel):
     email: str
     role: AdminRole
     is_active: bool
+    tenant_id: str | None = "default"
     name: str | None = None
     employee_id: str | None = None
     department: str | None = None
@@ -41,6 +44,7 @@ class AdminCreate(CAMSBaseModel):
     email: str
     password: str = Field(min_length=6)
     role: AdminRole = "admin"
+    tenant_id: str | None = None
 
 
 class AdminRegisterRequest(CAMSBaseModel):
@@ -48,6 +52,7 @@ class AdminRegisterRequest(CAMSBaseModel):
     email: str = Field(min_length=5, max_length=150)
     password: str = Field(min_length=6, max_length=128)
     name: str | None = None
+    tenant_id: str | None = None
 
 
 class EmployeeRegisterRequest(CAMSBaseModel):
@@ -56,3 +61,4 @@ class EmployeeRegisterRequest(CAMSBaseModel):
     email: str = Field(min_length=5, max_length=150)
     department: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=6, max_length=128)
+    tenant_id: str | None = None

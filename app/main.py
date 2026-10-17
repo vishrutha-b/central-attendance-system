@@ -1,8 +1,9 @@
 """
 Central Attendance Management System (CAMS) - Main Application.
 
-Configures FastAPI, lifespan events (database connection & index initialization),
-correlation ID tracking, error handling, CORS, and API routing.
+Configures FastAPI, lifespan events (database connection, index initialization,
+default tenant setup), correlation ID tracking, multi-tenant resolution, error handling,
+CORS, and API routing.
 """
 
 from __future__ import annotations
@@ -23,10 +24,16 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.health import router as health_router
 from app.api.v1.router import router as api_v1_router
 from app.config import get_settings
+from app.core.tenant import (
+    DEFAULT_TENANT_ID,
+    reset_current_tenant_id,
+    set_current_tenant_id,
+)
 from app.database.connection import close_database_connection, connect_to_database, get_database
 from app.database.indexes import create_indexes
 from app.exceptions import CAMSError
 from app.logging_config import setup_logging
+from app.repositories.tenant_repo import TenantRepository
 
 logger = logging.getLogger("app.main")
 
@@ -38,11 +45,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging(settings.log_level)
     logger.info("Starting Central Attendance Management System (env: %s)...", settings.app_env)
 
-    # 1. Connect to MongoDB and initialize indexes
+    # 1. Connect to MongoDB and initialize indexes + default tenant
     try:
         await connect_to_database()
         db = get_database()
         await create_indexes(db)
+        tenant_repo = TenantRepository(db)
+        await tenant_repo.ensure_default_tenant()
     except Exception as exc:
         logger.warning(
             "Database connection deferred or unavailable on startup: %s. "
@@ -65,10 +74,10 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         description=(
-            "Enterprise-grade Central Attendance Management System API with deterministic "
-            "policy evaluation, multi-session tracking, leave workflows, and automated monitoring."
+            "Enterprise-grade Central Attendance Management System API with multi-tenancy, "
+            "deterministic policy evaluation, multi-session tracking, and automated monitoring."
         ),
-        version="1.0.0",
+        version="1.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
@@ -84,17 +93,38 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ── Request / Correlation Middleware ──────────────────────────────────────────
+    # ── Request / Correlation & Tenant Context Middleware ──────────────────────────
     @app.middleware("http")
-    async def correlation_id_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+    async def tenant_and_correlation_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
         correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
         request.state.correlation_id = correlation_id
 
+        # Resolve tenant identifier
+        tenant_id = request.headers.get("X-Tenant-ID") or DEFAULT_TENANT_ID
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            try:
+                from app.security.auth import decode_access_token
+
+                payload = decode_access_token(auth_header[7:].strip())
+                if payload.get("tenant_id"):
+                    tenant_id = str(payload["tenant_id"])
+            except Exception:
+                pass
+
+        token = set_current_tenant_id(tenant_id)
+        request.state.tenant_id = tenant_id
+
         start_time = time.perf_counter()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        finally:
+            reset_current_tenant_id(token)
+
         process_time = time.perf_counter() - start_time
 
         response.headers["X-Correlation-ID"] = correlation_id
+        response.headers["X-Tenant-ID"] = tenant_id
         response.headers["X-Process-Time"] = f"{process_time:.4f}s"
         return response
 
@@ -120,58 +150,51 @@ def create_app() -> FastAPI:
     async def validation_error_handler(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        logger.warning("Validation error on %s: %s", request.url.path, exc.errors())
+        errors = [
+            {
+                "loc": list(err.get("loc", [])),
+                "msg": err.get("msg", ""),
+                "type": err.get("type", ""),
+            }
+            for err in exc.errors()
+        ]
+        logger.info("Validation error on %s: %s", request.url.path, errors)
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "error": "ValidationError",
-                "detail": "Request validation failed",
-                "errors": exc.errors(),
+                "detail": "Request body or query parameter validation failed.",
+                "errors": errors,
                 "correlation_id": getattr(request.state, "correlation_id", None),
             },
         )
 
-    @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Unhandled server exception on %s: %s", request.url.path, exc)
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "error": "InternalServerError",
-                "detail": "An internal server error occurred.",
-                "correlation_id": getattr(request.state, "correlation_id", None),
-            },
-        )
-
-    # ── Root & Static Dashboard Routes ──────────────────────────────────────────
+    # ── Static Files (Documentation Viewer) ──────────────────────────────────────
     static_dir = Path(__file__).resolve().parent.parent / "static"
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-        @app.get("/dashboard", include_in_schema=False)
-        @app.get("/app", include_in_schema=False)
-        async def dashboard() -> FileResponse:
-            return FileResponse(str(static_dir / "index.html"))
+    @app.get("/dashboard", include_in_schema=False)
+    @app.get("/app", include_in_schema=False)
+    async def dashboard() -> FileResponse:
+        return FileResponse(str(static_dir / "index.html"))
 
     @app.get("/", tags=["Root"])
     async def root(request: Request):
         accept = request.headers.get("accept", "")
-        # Browser navigation gets the executive frontend directly
         if "text/html" in accept and static_dir.exists():
             return FileResponse(str(static_dir / "index.html"))
         return {
             "app": settings.app_name,
-            "version": "1.0.0",
+            "version": "1.1.0",
             "environment": settings.app_env,
             "docs": "/docs",
             "dashboard": "/dashboard",
         }
 
-    # Mount health checks under both /health and /api/v1/health
+    # ── Routers ───────────────────────────────────────────────────────────────────
     app.include_router(health_router, prefix="/health")
     app.include_router(health_router, prefix="/api/v1/health")
-
-    # Mount API v1 router
     app.include_router(api_v1_router)
 
     return app

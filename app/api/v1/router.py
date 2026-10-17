@@ -1,4 +1,4 @@
-"""V1 API router — assembles all sub-routers."""
+"""V1 API router — assembles all sub-routers including multi-tenant management."""
 
 from __future__ import annotations
 
@@ -10,10 +10,12 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.employees import router as employees_router
 from app.api.v1.leave import holiday_router, leave_router
 from app.api.v1.reports import router as reports_router
+from app.api.v1.tenants import router as tenants_router
 
 router = APIRouter(prefix="/api/v1")
 
 router.include_router(auth_router)
+router.include_router(tenants_router)
 router.include_router(employees_router)
 router.include_router(attendance_router)
 router.include_router(reports_router)

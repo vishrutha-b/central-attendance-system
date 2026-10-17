@@ -20,19 +20,19 @@ from apscheduler.triggers.cron import CronTrigger
 from app.config import get_settings
 from app.database.connection import close_database_connection, connect_to_database, get_database
 from app.logging_config import setup_logging
-from app.workers.monitoring import run_monitoring_cycle
+from app.workers.monitoring import run_all_tenants_monitoring_cycle
 
 logger = logging.getLogger("app.workers.scheduler")
 
 
 async def scheduled_monitoring_job() -> None:
-    """Execute scheduled attendance monitoring cycle."""
-    logger.info("Starting scheduled attendance monitoring job...")
+    """Execute scheduled attendance monitoring cycle across all active tenants."""
+    logger.info("Starting scheduled multi-tenant attendance monitoring job...")
     try:
         db = get_database()
-        summary = await run_monitoring_cycle(db)
+        summary = await run_all_tenants_monitoring_cycle(db)
         logger.info(
-            "Monitoring job completed successfully: %s",
+            "Multi-tenant monitoring job completed successfully: %s",
             summary,
         )
     except Exception as exc:

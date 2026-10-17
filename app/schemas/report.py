@@ -73,6 +73,9 @@ class EmployeeAttendanceReport(CAMSBaseModel):
     holiday_dates: list[date]
     weekly_compliance: list[ComplianceStatus]
     has_no_attendance: bool
+    total_late_minutes: int = 0
+    total_early_exit_minutes: int = 0
+    total_overtime_hours: float = 0.0
 
 
 class CompanySummary(CAMSBaseModel):

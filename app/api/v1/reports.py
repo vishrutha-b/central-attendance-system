@@ -218,6 +218,9 @@ async def export_attendance_csv(
             "Violation Reasons",
             "Approved Leave Dates",
             "Holiday Dates",
+            "Total Late Minutes",
+            "Total Early Exit Minutes",
+            "Total Overtime Hours",
         ]
     )
 
@@ -248,6 +251,9 @@ async def export_attendance_csv(
                         _csv_safe(violations),
                         "; ".join(emp.get("approved_leave_dates", [])),
                         "; ".join(emp.get("holiday_dates", [])),
+                        emp.get("total_late_minutes", 0),
+                        emp.get("total_early_exit_minutes", 0),
+                        emp.get("total_overtime_hours", 0.0),
                     ]
                 )
         else:
@@ -273,6 +279,9 @@ async def export_attendance_csv(
                     "",
                     "",
                     "",
+                    emp.get("total_late_minutes", 0),
+                    emp.get("total_early_exit_minutes", 0),
+                    emp.get("total_overtime_hours", 0.0),
                 ]
             )
 

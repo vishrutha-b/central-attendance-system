@@ -109,3 +109,15 @@ class TokenExpiredError(UnauthorizedError):
 
 class InvalidTokenError(UnauthorizedError):
     detail = "Invalid or malformed token."
+
+
+class InsufficientLeaveBalanceError(BadRequestError):
+    detail = "Insufficient leave balance for the requested leave type."
+
+
+class RegularizationNotFoundError(NotFoundError):
+    detail = "Regularization request not found."
+
+
+class RegularizationTransitionError(BadRequestError):
+    detail = "Regularization request has already been reviewed."

@@ -12,6 +12,19 @@ class CamsApiClient {
     this.baseUrl = isStandalone ? 'http://localhost:8000' : window.location.origin;
     this.tokenKey = 'cams_access_token';
     this.userKey = 'cams_current_user';
+    this.tenantKey = 'cams_current_tenant';
+  }
+
+  getTenantId() {
+    return localStorage.getItem(this.tenantKey) || 'default';
+  }
+
+  setTenantId(tenantId) {
+    if (tenantId) {
+      localStorage.setItem(this.tenantKey, tenantId);
+    } else {
+      localStorage.removeItem(this.tenantKey);
+    }
   }
 
   getToken() {
@@ -53,6 +66,11 @@ class CamsApiClient {
     const token = this.getToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const tenantId = this.getTenantId();
+    if (tenantId) {
+      headers['X-Tenant-ID'] = tenantId;
     }
 
     const config = {
@@ -124,24 +142,29 @@ class CamsApiClient {
     }
   }
 
-  async login(username, password) {
+  async login(username, password, tenantId = null) {
+    const activeTenant = tenantId || this.getTenantId();
     const result = await this.request('/api/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, tenant_id: activeTenant }),
     });
 
     if (result && result.access_token) {
       this.setToken(result.access_token);
+      if (result.tenant_id) {
+        this.setTenantId(result.tenant_id);
+      }
       const payload = this.parseJwt(result.access_token) || {};
       try {
         const me = await this.getMe();
-        this.setCurrentUser({ ...payload, ...me });
+        this.setCurrentUser({ ...payload, ...me, tenant_id: result.tenant_id || activeTenant });
       } catch (e) {
         this.setCurrentUser({
           username: payload.username || username,
           role: payload.role || (username.toUpperCase().startsWith('EMP-') ? 'employee' : 'admin'),
           employee_id: payload.employee_id || (payload.role === 'employee' ? payload.sub : null),
           name: payload.name || username,
+          tenant_id: result.tenant_id || activeTenant,
         });
       }
     }
@@ -149,17 +172,24 @@ class CamsApiClient {
   }
 
   async registerAdmin(payload) {
+    if (!payload.tenant_id) {
+      payload.tenant_id = this.getTenantId();
+    }
     const result = await this.request('/api/v1/auth/register/admin', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
     if (result && result.access_token) {
       this.setToken(result.access_token);
+      if (result.tenant_id) {
+        this.setTenantId(result.tenant_id);
+      }
       const tokenPayload = this.parseJwt(result.access_token) || {};
       this.setCurrentUser({
         username: payload.username,
         role: 'admin',
         name: payload.name || payload.username,
+        tenant_id: result.tenant_id || payload.tenant_id,
         ...tokenPayload,
       });
     }
@@ -167,12 +197,18 @@ class CamsApiClient {
   }
 
   async registerEmployee(payload) {
+    if (!payload.tenant_id) {
+      payload.tenant_id = this.getTenantId();
+    }
     const result = await this.request('/api/v1/auth/register/employee', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
     if (result && result.access_token) {
       this.setToken(result.access_token);
+      if (result.tenant_id) {
+        this.setTenantId(result.tenant_id);
+      }
       const tokenPayload = this.parseJwt(result.access_token) || {};
       this.setCurrentUser({
         username: payload.employee_id || tokenPayload.sub,
@@ -180,6 +216,7 @@ class CamsApiClient {
         name: payload.name,
         role: 'employee',
         department: payload.department,
+        tenant_id: result.tenant_id || payload.tenant_id,
         ...tokenPayload,
       });
     }
@@ -391,6 +428,74 @@ class CamsApiClient {
     return this.request('/api/v1/admin/users', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  // ── Real-Time Presence ───────────────────────────────────────
+  async getLivePresence(department = null) {
+    const query = department ? `?department=${encodeURIComponent(department)}` : '';
+    return this.request(`/api/v1/attendance/live-presence${query}`);
+  }
+
+  // ── Regularization Workflow ─────────────────────────────────
+  async submitRegularization(data) {
+    return this.request('/api/v1/attendance/regularize', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async listRegularizations(params = {}) {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page);
+    if (params.page_size) query.append('page_size', params.page_size);
+    if (params.employee_id) query.append('employee_id', params.employee_id);
+    if (params.status) query.append('status', params.status);
+    return this.request(`/api/v1/attendance/regularize?${query.toString()}`);
+  }
+
+  async reviewRegularization(requestId, action, reviewerNotes = null) {
+    return this.request(`/api/v1/attendance/regularize/${encodeURIComponent(requestId)}/decision`, {
+      method: 'POST',
+      body: JSON.stringify({
+        action,
+        reviewer_notes: reviewerNotes,
+      }),
+    });
+  }
+
+  // ── Leave Balances & Quotas ─────────────────────────────────
+  async getLeaveBalances(employeeId, year = 2026) {
+    return this.request(`/api/v1/leave/balances/${encodeURIComponent(employeeId)}?year=${year}`);
+  }
+
+  async allocateLeaveBalance(data) {
+    return this.request('/api/v1/leave/balances/allocate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ── Tenant Organization Management ──────────────────────────
+  async getTenants(skip = 0, limit = 50) {
+    return this.request(`/api/v1/tenants?skip=${skip}&limit=${limit}`);
+  }
+
+  async getTenant(tenantId) {
+    return this.request(`/api/v1/tenants/${encodeURIComponent(tenantId)}`);
+  }
+
+  async onboardTenant(tenantData) {
+    return this.request('/api/v1/tenants', {
+      method: 'POST',
+      body: JSON.stringify(tenantData),
+    });
+  }
+
+  async updateTenant(tenantId, updateData) {
+    return this.request(`/api/v1/tenants/${encodeURIComponent(tenantId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
     });
   }
 }

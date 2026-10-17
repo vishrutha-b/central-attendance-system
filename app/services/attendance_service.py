@@ -10,6 +10,7 @@ from typing import Any
 from app.exceptions import (
     AttendanceSequenceError,
     EmployeeInactiveError,
+    RegularizationTransitionError,
 )
 from app.repositories.attendance_repo import AttendanceRepository
 from app.repositories.employee_repo import EmployeeRepository
@@ -19,6 +20,10 @@ from app.schemas.attendance import (
     AttendanceExitRequest,
     AttendanceQuickRecordRequest,
     parse_flexible_datetime,
+)
+from app.schemas.regularization import (
+    RegularizationCreate,
+    RegularizationDecision,
 )
 from app.services.audit_service import AuditService
 from app.services.notification_service import NotificationService
@@ -52,12 +57,16 @@ class AttendanceService:
         audit_service: AuditService,
         notification_service: NotificationService | None = None,
         company_tz: str = "Asia/Kolkata",
+        regularization_repo: Any = None,
+        leave_repo: Any = None,
     ) -> None:
         self.attendance_repo = attendance_repo
         self.employee_repo = employee_repo
         self.audit_service = audit_service
         self.notification_service = notification_service or NotificationService()
         self.company_tz = company_tz
+        self.regularization_repo = regularization_repo
+        self.leave_repo = leave_repo
 
     async def record_entry(self, data: AttendanceEntryRequest, actor_id: str) -> dict[str, Any]:
         """Record a new attendance entry for an employee."""
@@ -424,3 +433,272 @@ class AttendanceService:
             start_date=start_date,
             end_date=end_date,
         )
+
+    async def create_regularization(
+        self, data: RegularizationCreate, actor_id: str
+    ) -> dict[str, Any]:
+        """Submit an attendance regularization request."""
+        employee = await self.employee_repo.get_or_raise(data.employee_id)
+        if not employee.get("is_active", True):
+            raise EmployeeInactiveError(f"Employee '{data.employee_id}' is inactive.")
+
+        if self.regularization_repo is None:
+            raise ValueError("RegularizationRepository not configured.")
+
+        entry_dt = parse_flexible_datetime(
+            data.requested_entry_time,
+            base_date=data.date,
+            company_tz_name=self.company_tz,
+        )
+        exit_dt = parse_flexible_datetime(
+            data.requested_exit_time,
+            base_date=data.date,
+            company_tz_name=self.company_tz,
+        )
+        if exit_dt <= entry_dt:
+            raise AttendanceSequenceError("requested_exit_time must be after requested_entry_time.")
+
+        now = datetime.now(tz=UTC)
+        req_id = f"REG-{uuid.uuid4().hex[:10].upper()}"
+        doc = {
+            "request_id": req_id,
+            "employee_id": data.employee_id,
+            "date": data.date.isoformat(),
+            "requested_entry_time": entry_dt.isoformat(),
+            "requested_exit_time": exit_dt.isoformat(),
+            "reason": data.reason,
+            "notes": data.notes,
+            "status": "pending",
+            "reviewed_by": None,
+            "reviewer_notes": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        created = await self.regularization_repo.create(doc)
+        await self.audit_service.log(
+            actor_id=actor_id,
+            action="regularization.create",
+            resource_type="regularization",
+            resource_id=req_id,
+            employee_id=data.employee_id,
+            new_values={
+                "date": data.date.isoformat(),
+                "reason": data.reason,
+                "entry": entry_dt.isoformat(),
+                "exit": exit_dt.isoformat(),
+            },
+        )
+        return created
+
+    async def list_regularizations(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        employee_id: str | None = None,
+        status: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List regularization requests with optional filtering."""
+        if self.regularization_repo is None:
+            return [], 0
+        skip = (page - 1) * page_size
+        return await self.regularization_repo.list_requests(
+            skip=skip, limit=page_size, employee_id=employee_id, status=status
+        )
+
+    async def review_regularization(
+        self, request_id: str, decision: RegularizationDecision, reviewer_id: str
+    ) -> dict[str, Any]:
+        """Approve or reject an attendance regularization request."""
+        if self.regularization_repo is None:
+            raise ValueError("RegularizationRepository not configured.")
+
+        req = await self.regularization_repo.get_or_raise(request_id)
+        if req["status"] != "pending":
+            raise RegularizationTransitionError(
+                f"Cannot review regularization request in status '{req['status']}'."
+            )
+
+        if decision.action == "approved":
+            entry_dt = datetime.fromisoformat(req["requested_entry_time"])
+            exit_dt = datetime.fromisoformat(req["requested_exit_time"])
+            delta_seconds = (exit_dt - entry_dt).total_seconds()
+            total_hours = round(delta_seconds / 3600.0, 4)
+
+            att_date = req["date"]
+            d_obj = date.fromisoformat(att_date) if isinstance(att_date, str) else att_date
+            existing_sessions = await self.attendance_repo.find_sessions_for_date(
+                req["employee_id"], d_obj
+            )
+
+            now = datetime.now(tz=UTC)
+            if existing_sessions:
+                target_session = existing_sessions[0]
+                await self.attendance_repo.update(
+                    target_session["attendance_id"],
+                    {
+                        "entry_time": entry_dt,
+                        "exit_time": exit_dt,
+                        "total_hours": total_hours,
+                        "attendance_status": "complete",
+                    },
+                )
+            else:
+                att_id = f"ATT-{uuid.uuid4().hex[:12].upper()}"
+                doc = {
+                    "attendance_id": att_id,
+                    "employee_id": req["employee_id"],
+                    "date": att_date if isinstance(att_date, str) else att_date.isoformat(),
+                    "entry_time": entry_dt,
+                    "exit_time": exit_dt,
+                    "total_hours": total_hours,
+                    "attendance_status": "complete",
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                await self.attendance_repo.create(doc)
+
+            await self.audit_service.log(
+                actor_id=reviewer_id,
+                action="regularization.approve",
+                resource_type="regularization",
+                resource_id=request_id,
+                employee_id=req["employee_id"],
+                new_values={"status": "approved", "notes": decision.reviewer_notes},
+            )
+        else:
+            await self.audit_service.log(
+                actor_id=reviewer_id,
+                action="regularization.reject",
+                resource_type="regularization",
+                resource_id=request_id,
+                employee_id=req["employee_id"],
+                new_values={"status": "rejected", "notes": decision.reviewer_notes},
+            )
+
+        return await self.regularization_repo.update_decision(
+            request_id=request_id,
+            status=decision.action,
+            reviewed_by=reviewer_id,
+            reviewer_notes=decision.reviewer_notes,
+        )
+
+    async def get_live_presence(self, department: str | None = None) -> dict[str, Any]:
+        """Aggregate real-time presence data for all active employees."""
+        from zoneinfo import ZoneInfo
+
+        from app.services.policy_service import calculate_valid_hours_for_sessions, parse_session
+
+        tz = ZoneInfo(self.company_tz)
+        today_local = datetime.now(tz=tz).date()
+        today_str = today_local.isoformat()
+
+        # Fetch active employees
+        query: dict[str, Any] = {"is_active": True}
+        if department:
+            query["department"] = department
+        cursor = self.employee_repo.col.find(query, {"_id": 0})
+        employees = await cursor.to_list(length=None)
+
+        # Fetch attendance sessions for today
+        att_cursor = self.attendance_repo.col.find(
+            {"date": today_str, "is_deleted": {"$ne": True}}, {"_id": 0}
+        )
+        today_sessions = await att_cursor.to_list(length=None)
+
+        # Group sessions by employee_id
+        sessions_by_emp: dict[str, list[dict[str, Any]]] = {}
+        for s in today_sessions:
+            emp_id = s["employee_id"].upper()
+            sessions_by_emp.setdefault(emp_id, []).append(s)
+
+        # Fetch today's approved leaves
+        leaves_by_emp: set[str] = set()
+        if self.leave_repo:
+            l_cursor = self.leave_repo.col.find(
+                {
+                    "status": "approved",
+                    "start_date": {"$lte": today_str},
+                    "end_date": {"$gte": today_str},
+                },
+                {"_id": 0, "employee_id": 1},
+            )
+            approved_leaves = await l_cursor.to_list(length=None)
+            leaves_by_emp = {lv["employee_id"].upper() for lv in approved_leaves}
+
+        employee_cards: list[dict[str, Any]] = []
+        in_office_count = 0
+        on_break_count = 0
+        on_leave_count = 0
+        absent_count = 0
+
+        for emp in employees:
+            e_id = emp["employee_id"].upper()
+            emp_sessions = sessions_by_emp.get(e_id, [])
+            has_leave = e_id in leaves_by_emp
+
+            open_session = None
+            for s in emp_sessions:
+                if s.get("exit_time") is None:
+                    open_session = s
+                    break
+
+            if has_leave:
+                presence_status = "on_leave"
+                on_leave_count += 1
+            elif open_session is not None:
+                presence_status = "in_office"
+                in_office_count += 1
+            elif emp_sessions:
+                presence_status = "on_break"
+                on_break_count += 1
+            else:
+                presence_status = "absent"
+                absent_count += 1
+
+            parsed_sessions = [parse_session(s) for s in emp_sessions]
+            accumulated_hours = calculate_valid_hours_for_sessions(
+                [ps for ps in parsed_sessions if ps.is_complete]
+            )
+
+            first_entry = None
+            last_exit = None
+            if emp_sessions:
+                valid_entries = [s["entry_time"] for s in emp_sessions if s.get("entry_time")]
+                if valid_entries:
+                    first_entry_dt = min(valid_entries)
+                    first_entry = (
+                        first_entry_dt.astimezone(tz).strftime("%I:%M %p")
+                        if first_entry_dt.tzinfo
+                        else first_entry_dt.strftime("%I:%M %p")
+                    )
+                valid_exits = [s["exit_time"] for s in emp_sessions if s.get("exit_time")]
+                if valid_exits:
+                    last_exit_dt = max(valid_exits)
+                    last_exit = (
+                        last_exit_dt.astimezone(tz).strftime("%I:%M %p")
+                        if last_exit_dt.tzinfo
+                        else last_exit_dt.strftime("%I:%M %p")
+                    )
+
+            employee_cards.append(
+                {
+                    "employee_id": e_id,
+                    "name": emp["name"],
+                    "department": emp.get("department", "General"),
+                    "email": emp.get("email", ""),
+                    "presence_status": presence_status,
+                    "first_entry": first_entry,
+                    "last_exit": last_exit,
+                    "accumulated_hours": round(accumulated_hours, 2),
+                }
+            )
+
+        return {
+            "date": today_str,
+            "total_active_employees": len(employees),
+            "in_office_count": in_office_count,
+            "on_break_count": on_break_count,
+            "on_leave_count": on_leave_count,
+            "absent_count": absent_count,
+            "employees": employee_cards,
+        }

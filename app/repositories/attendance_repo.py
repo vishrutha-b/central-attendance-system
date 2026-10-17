@@ -1,4 +1,4 @@
-"""Attendance repository — async MongoDB CRUD."""
+"""Attendance repository — async MongoDB CRUD with multi-tenant isolation."""
 
 from __future__ import annotations
 
@@ -15,10 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class AttendanceRepository:
-    def __init__(self, db: Any) -> None:
+    def __init__(self, db: Any, tenant_id: str = "default") -> None:
         self.col = db.attendance
+        self.tenant_id = tenant_id
 
     async def create(self, doc: dict[str, Any]) -> dict[str, Any]:
+        doc["tenant_id"] = self.tenant_id
         try:
             await self.col.insert_one(doc)
             return doc
@@ -26,7 +28,10 @@ class AttendanceRepository:
             raise AttendanceConflictError("Duplicate attendance record.") from exc
 
     async def find_by_id(self, attendance_id: str) -> dict[str, Any] | None:
-        return await self.col.find_one({"attendance_id": attendance_id}, {"_id": 0})
+        return await self.col.find_one(
+            {"tenant_id": self.tenant_id, "attendance_id": attendance_id},
+            {"_id": 0},
+        )
 
     async def get_or_raise(self, attendance_id: str) -> dict[str, Any]:
         doc = await self.find_by_id(attendance_id)
@@ -35,10 +40,14 @@ class AttendanceRepository:
         return doc
 
     async def find_open_session(self, employee_id: str) -> dict[str, Any] | None:
-        """Return the most recent session with no exit_time."""
+        """Return the most recent session with no exit_time for this tenant and employee."""
         cursor = (
             self.col.find(
-                {"employee_id": employee_id, "exit_time": None},
+                {
+                    "tenant_id": self.tenant_id,
+                    "employee_id": employee_id,
+                    "exit_time": None,
+                },
                 {"_id": 0},
             )
             .sort("entry_time", -1)
@@ -51,6 +60,7 @@ class AttendanceRepository:
         self, employee_id: str, attendance_date: date
     ) -> list[dict[str, Any]]:
         query = {
+            "tenant_id": self.tenant_id,
             "employee_id": employee_id,
             "date": attendance_date.isoformat(),
         }
@@ -61,6 +71,7 @@ class AttendanceRepository:
         self, employee_id: str, start_date: date, end_date: date
     ) -> list[dict[str, Any]]:
         query = {
+            "tenant_id": self.tenant_id,
             "employee_id": employee_id,
             "date": {
                 "$gte": start_date.isoformat(),
@@ -72,10 +83,11 @@ class AttendanceRepository:
 
     async def find_all_in_range(self, start_date: date, end_date: date) -> list[dict[str, Any]]:
         query = {
+            "tenant_id": self.tenant_id,
             "date": {
                 "$gte": start_date.isoformat(),
                 "$lte": end_date.isoformat(),
-            }
+            },
         }
         cursor = self.col.find(query, {"_id": 0}).sort([("employee_id", 1), ("date", 1)])
         return await cursor.to_list(length=None)
@@ -83,7 +95,7 @@ class AttendanceRepository:
     async def update(self, attendance_id: str, updates: dict[str, Any]) -> dict[str, Any]:
         updates["updated_at"] = datetime.now(tz=UTC)
         doc = await self.col.find_one_and_update(
-            {"attendance_id": attendance_id},
+            {"tenant_id": self.tenant_id, "attendance_id": attendance_id},
             {"$set": updates},
             return_document=ReturnDocument.AFTER,
             projection={"_id": 0},
@@ -93,7 +105,9 @@ class AttendanceRepository:
         return doc
 
     async def count_by_employee(self, employee_id: str) -> int:
-        return await self.col.count_documents({"employee_id": employee_id})
+        return await self.col.count_documents(
+            {"tenant_id": self.tenant_id, "employee_id": employee_id}
+        )
 
     async def list_for_employee(
         self,
@@ -103,7 +117,10 @@ class AttendanceRepository:
         start_date: date | None = None,
         end_date: date | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        query: dict[str, Any] = {"employee_id": employee_id}
+        query: dict[str, Any] = {
+            "tenant_id": self.tenant_id,
+            "employee_id": employee_id,
+        }
         if start_date:
             query.setdefault("date", {})["$gte"] = start_date.isoformat()
         if end_date:

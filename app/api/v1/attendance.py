@@ -17,6 +17,11 @@ from app.schemas.attendance import (
     AttendanceQuickRecordRequest,
     AttendanceSessionResponse,
 )
+from app.schemas.regularization import (
+    RegularizationCreate,
+    RegularizationDecision,
+    RegularizationResponse,
+)
 from app.services.attendance_service import AttendanceService
 
 logger = logging.getLogger(__name__)
@@ -92,6 +97,86 @@ async def quick_record(
 
 
 @router.get(
+    "/live-presence",
+    summary="Live employee presence board",
+    description="Retrieve real-time presence indicators (in office, break, leave, absent).",
+)
+async def get_live_presence(
+    department: str | None = Query(default=None),
+    service: AttendanceService = Depends(get_attendance_service),
+    current_admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
+    return await service.get_live_presence(department=department)
+
+
+@router.post(
+    "/regularize",
+    response_model=RegularizationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit attendance regularization request",
+    description="Submit an attendance regularization request for missing or incorrect punches.",
+)
+async def create_regularization(
+    data: RegularizationCreate,
+    service: AttendanceService = Depends(get_attendance_service),
+    current_admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
+    _check_employee_access(current_admin, data.employee_id)
+    return await service.create_regularization(data, actor_id=current_admin["admin_id"])
+
+
+@router.get(
+    "/regularize",
+    summary="List attendance regularization requests",
+    description="Retrieve paginated attendance regularization requests.",
+)
+async def list_regularizations(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    employee_id: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    service: AttendanceService = Depends(get_attendance_service),
+    current_admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
+    if current_admin.get("role") == "employee":
+        user_emp_id = (
+            current_admin.get("employee_id") or current_admin.get("admin_id") or ""
+        ).upper()
+        employee_id = user_emp_id
+
+    items, total = await service.list_regularizations(
+        page=page, page_size=page_size, employee_id=employee_id, status=status
+    )
+    total_pages = max(1, math.ceil(total / page_size))
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
+
+
+@router.post(
+    "/regularize/{request_id}/decision",
+    response_model=RegularizationResponse,
+    summary="Review regularization request",
+    description="Approve or reject a regularization request. Requires admin role.",
+)
+async def review_regularization(
+    request_id: str,
+    decision: RegularizationDecision,
+    service: AttendanceService = Depends(get_attendance_service),
+    current_admin: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return await service.review_regularization(
+        request_id=request_id,
+        decision=decision,
+        reviewer_id=current_admin["admin_id"],
+    )
+
+
+@router.get(
     "/{employee_id}",
     summary="Get attendance for a specific date",
     description="Retrieve all attendance sessions for an employee on a given date.",
@@ -104,7 +189,24 @@ async def get_attendance_by_date(
 ) -> dict[str, Any]:
     _check_employee_access(current_admin, employee_id)
     sessions = await service.get_attendance_for_date(employee_id, date.isoformat())
-    return {"employee_id": employee_id.upper(), "date": date.isoformat(), "sessions": sessions}
+    from app.config import get_settings
+    from app.services.policy_service import calculate_shift_metrics
+
+    settings = get_settings()
+    metrics = calculate_shift_metrics(
+        sessions,
+        shift_start_str=settings.shift_start_time,
+        shift_end_str=settings.shift_end_time,
+        late_grace_minutes=settings.late_grace_minutes,
+        standard_shift_hours=settings.standard_shift_hours,
+        company_tz_name=settings.company_timezone,
+    )
+    return {
+        "employee_id": employee_id.upper(),
+        "date": date.isoformat(),
+        "sessions": sessions,
+        "metrics": metrics,
+    }
 
 
 @router.get(

@@ -456,3 +456,79 @@ def calculate_overall_stats(
         "invalid_sessions": len(invalid),
         "has_no_attendance": len(parsed) == 0,
     }
+
+
+def calculate_shift_metrics(
+    sessions: list[dict[str, Any]],
+    shift_start_str: str = "09:30",
+    shift_end_str: str = "18:30",
+    late_grace_minutes: int = 15,
+    standard_shift_hours: float = 8.0,
+    company_tz_name: str = "Asia/Kolkata",
+) -> dict[str, Any]:
+    """
+    Calculate late arrival minutes, early exit minutes, and overtime hours for a set of sessions.
+    Operates on sessions belonging to a specific date.
+    """
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(company_tz_name)
+    parsed = [parse_session(s) for s in sessions if not s.get("is_deleted")]
+    completed = [s for s in parsed if s.is_complete]
+
+    if not completed:
+        return {
+            "late_minutes": 0,
+            "early_exit_minutes": 0,
+            "overtime_hours": 0.0,
+            "is_late": False,
+            "is_early_exit": False,
+        }
+
+    # Earliest entry
+    earliest_entry = min(s.entry_time for s in completed)
+    latest_exit = max((s.exit_time for s in completed if s.exit_time is not None), default=None)
+
+    # Convert to local time
+    if earliest_entry.tzinfo:
+        local_entry = earliest_entry.astimezone(tz)
+    else:
+        local_entry = earliest_entry.replace(tzinfo=tz)
+    entry_mins = local_entry.hour * 60 + local_entry.minute
+
+    try:
+        sh_hour, sh_min = map(int, shift_start_str.split(":"))
+        shift_start_mins = sh_hour * 60 + sh_min
+    except Exception:
+        shift_start_mins = 9 * 60 + 30
+
+    late_diff = entry_mins - shift_start_mins
+    late_mins = max(0, late_diff) if late_diff > late_grace_minutes else 0
+
+    early_mins = 0
+    if latest_exit:
+        local_exit = (
+            latest_exit.astimezone(tz) if latest_exit.tzinfo else latest_exit.replace(tzinfo=tz)
+        )
+        exit_mins = local_exit.hour * 60 + local_exit.minute
+
+        try:
+            eh_hour, eh_min = map(int, shift_end_str.split(":"))
+            shift_end_mins = eh_hour * 60 + eh_min
+        except Exception:
+            shift_end_mins = 18 * 60 + 30
+
+        if exit_mins < shift_end_mins:
+            early_mins = shift_end_mins - exit_mins
+
+    # Overtime hours calculation using interval-merged total hours
+    total_valid_hours = calculate_valid_hours_for_sessions(completed)
+    overtime_hours = max(0.0, round(total_valid_hours - standard_shift_hours, 2))
+
+    return {
+        "late_minutes": late_mins,
+        "early_exit_minutes": early_mins,
+        "overtime_hours": overtime_hours,
+        "is_late": late_mins > 0,
+        "is_early_exit": early_mins > 0,
+    }

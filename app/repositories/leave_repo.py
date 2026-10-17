@@ -1,4 +1,4 @@
-"""Leave and Holiday repositories."""
+"""Leave and Holiday repositories with multi-tenant isolation."""
 
 from __future__ import annotations
 
@@ -19,10 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 class LeaveRepository:
-    def __init__(self, db: Any) -> None:
+    def __init__(self, db: Any, tenant_id: str = "default") -> None:
         self.col = db.leave_requests
+        self.tenant_id = tenant_id
 
     async def create(self, doc: dict[str, Any]) -> dict[str, Any]:
+        doc["tenant_id"] = self.tenant_id
         try:
             await self.col.insert_one(doc)
             return doc
@@ -30,7 +32,10 @@ class LeaveRepository:
             raise ConflictError("Duplicate leave request.") from exc
 
     async def find_by_id(self, leave_id: str) -> dict[str, Any] | None:
-        return await self.col.find_one({"leave_id": leave_id}, {"_id": 0})
+        return await self.col.find_one(
+            {"tenant_id": self.tenant_id, "leave_id": leave_id},
+            {"_id": 0},
+        )
 
     async def get_or_raise(self, leave_id: str) -> dict[str, Any]:
         doc = await self.find_by_id(leave_id)
@@ -41,8 +46,9 @@ class LeaveRepository:
     async def find_overlapping(
         self, employee_id: str, start_date: date, end_date: date, exclude_id: str | None = None
     ) -> list[dict[str, Any]]:
-        """Find approved/pending leaves that overlap the given date range."""
+        """Find approved/pending leaves that overlap the given date range for this tenant."""
         query: dict[str, Any] = {
+            "tenant_id": self.tenant_id,
             "employee_id": employee_id,
             "status": {"$in": ["pending", "approved"]},
             "start_date": {"$lte": end_date.isoformat()},
@@ -57,7 +63,7 @@ class LeaveRepository:
         self, leave_id: str, status: str, reviewed_by: str, note: str | None
     ) -> dict[str, Any]:
         doc = await self.col.find_one_and_update(
-            {"leave_id": leave_id},
+            {"tenant_id": self.tenant_id, "leave_id": leave_id},
             {
                 "$set": {
                     "status": status,
@@ -80,7 +86,7 @@ class LeaveRepository:
         employee_id: str | None = None,
         status: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        query: dict[str, Any] = {}
+        query: dict[str, Any] = {"tenant_id": self.tenant_id}
         if employee_id:
             query["employee_id"] = employee_id
         if status:
@@ -95,6 +101,7 @@ class LeaveRepository:
         self, employee_id: str, start_date: date, end_date: date
     ) -> list[dict[str, Any]]:
         query = {
+            "tenant_id": self.tenant_id,
             "employee_id": employee_id,
             "status": "approved",
             "start_date": {"$lte": end_date.isoformat()},
@@ -105,10 +112,12 @@ class LeaveRepository:
 
 
 class HolidayRepository:
-    def __init__(self, db: Any) -> None:
+    def __init__(self, db: Any, tenant_id: str = "default") -> None:
         self.col = db.holidays
+        self.tenant_id = tenant_id
 
     async def create(self, doc: dict[str, Any]) -> dict[str, Any]:
+        doc["tenant_id"] = self.tenant_id
         try:
             await self.col.insert_one(doc)
             return doc
@@ -116,12 +125,15 @@ class HolidayRepository:
             raise HolidayConflictError("A holiday already exists on this date.") from exc
 
     async def find_by_date(self, holiday_date: date) -> dict[str, Any] | None:
-        return await self.col.find_one({"date": holiday_date.isoformat()}, {"_id": 0})
+        return await self.col.find_one(
+            {"tenant_id": self.tenant_id, "date": holiday_date.isoformat()},
+            {"_id": 0},
+        )
 
     async def list_holidays(
         self, start_date: date | None = None, end_date: date | None = None
     ) -> list[dict[str, Any]]:
-        query: dict[str, Any] = {}
+        query: dict[str, Any] = {"tenant_id": self.tenant_id}
         if start_date or end_date:
             date_filter: dict[str, Any] = {}
             if start_date:

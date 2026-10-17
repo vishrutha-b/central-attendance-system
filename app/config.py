@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     min_hours_per_week: float = Field(default=15.0, ge=0.0)
     min_avg_hours_per_day: float = Field(default=5.0, ge=0.0)
     allow_multiple_sessions: bool = True
+    shift_start_time: str = "09:30"
+    shift_end_time: str = "18:30"
+    late_grace_minutes: int = Field(default=15, ge=0)
+    standard_shift_hours: float = Field(default=8.0, ge=1.0)
 
     # ── Leave & Holiday Policy ────────────────────────────────────────────────
     working_days_per_week: int = Field(default=5, ge=1, le=7)

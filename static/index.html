@@ -61,6 +61,14 @@
       <!-- ── FORM 1: SIGN IN ────────────────────────────────────────────────── -->
       <form id="auth-login-form" class="auth-form">
         <div class="form-group">
+          <label class="form-label" for="auth-input-tenant">
+            <span>Organization ID</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">(e.g. 'default', 'acme-corp')</span>
+          </label>
+          <input type="text" class="form-control" id="auth-input-tenant" placeholder="default" value="default" required>
+        </div>
+
+        <div class="form-group">
           <label class="form-label" for="auth-input-username" id="auth-label-username">
             <span>Admin Username</span>
           </label>
@@ -125,6 +133,14 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label class="form-label" for="auth-reg-tenant-id">
+            <span>Organization ID</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">(e.g. 'default', 'acme-corp')</span>
+          </label>
+          <input type="text" class="form-control" id="auth-reg-tenant-id" placeholder="default" value="default" required>
+        </div>
+
         <!-- Common fields: Email & Password -->
         <div class="form-group">
           <label class="form-label" for="auth-reg-email">Work Email</label>
@@ -187,10 +203,16 @@
           <button type="button" class="nav-link" data-tab="leave">Leaves & Holidays</button>
           <button type="button" class="nav-link" data-tab="reports">Reports</button>
           <button type="button" class="nav-link" data-tab="audit">Audit Logs</button>
+          <button type="button" class="nav-link" data-tab="tenants" id="nav-tab-tenants" style="display: none;">Organizations</button>
         </nav>
       </div>
 
       <div class="nav-right">
+        <!-- Active Organization Pill -->
+        <div class="health-status" id="nav-active-tenant-pill" title="Current Active Organization" style="background: rgba(99, 102, 241, 0.12); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.25);">
+          <span style="font-size: 0.78rem; font-weight: 600;" id="nav-active-tenant-text">🏢 Org: default</span>
+        </div>
+
         <!-- Live Health Dot -->
         <div class="health-status" title="Backend connectivity">
           <span class="health-dot" id="health-indicator-dot"></span>
@@ -292,6 +314,74 @@
           <span class="kpi-label">Weekly Threshold</span>
           <div class="kpi-number">15.0h</div>
           <span class="kpi-footer">3 qualifying in-office days</span>
+        </div>
+      </div>
+
+      <!-- Real-Time Presence Live Board -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="status-dot-pulse green"></span>
+              <h3 class="card-title" style="margin: 0;">Live Workforce Presence</h3>
+            </div>
+            <span class="card-subtitle">Real-time office presence and activity status today</span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <select class="form-control" id="presence-dept-filter" onchange="app.loadLivePresence()" style="font-size: 0.8rem; padding: 4px 10px; max-width: 170px;">
+              <option value="">All Departments</option>
+              <option value="Engineering">Engineering</option>
+              <option value="Product">Product</option>
+              <option value="Design">Design</option>
+              <option value="Human Resources">Human Resources</option>
+              <option value="Sales">Sales</option>
+            </select>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="app.loadLivePresence()" title="Refresh live status">
+              ↻ Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <!-- Summary Counter Pills -->
+          <div class="presence-summary-bar">
+            <span class="presence-stat-pill in-office" id="pill-presence-in-office">
+              <span class="status-dot-pulse green"></span>
+              <span>In Office: <strong id="presence-count-in-office">0</strong></span>
+            </span>
+            <span class="presence-stat-pill on-break" id="pill-presence-on-break">
+              <span class="status-dot-pulse amber"></span>
+              <span>On Break: <strong id="presence-count-on-break">0</strong></span>
+            </span>
+            <span class="presence-stat-pill on-leave" id="pill-presence-on-leave">
+              <span class="status-dot-pulse blue"></span>
+              <span>On Leave: <strong id="presence-count-on-leave">0</strong></span>
+            </span>
+            <span class="presence-stat-pill absent" id="pill-presence-absent">
+              <span class="status-dot-pulse gray"></span>
+              <span>Absent: <strong id="presence-count-absent">0</strong></span>
+            </span>
+          </div>
+
+          <!-- Live Presence Table -->
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Department</th>
+                  <th>Presence Status</th>
+                  <th>Clock In</th>
+                  <th>Last Clock Out</th>
+                  <th>Hours Today</th>
+                </tr>
+              </thead>
+              <tbody id="presence-table-body">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading live presence...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -466,17 +556,21 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">Attendance Timesheet Logs</h2>
-          <p class="page-desc">Complete session records, duration calculations, and policy compliance</p>
+          <p class="page-desc">Complete session records, duration calculations, shift metrics & regularizations</p>
         </div>
+        <button type="button" class="btn btn-primary" data-open-modal="modal-employee-regularize">
+          + Request Regularization
+        </button>
       </div>
 
-      <div class="card">
+      <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-header">
-          <div class="filter-row" style="width: 100%;">
+          <div class="filter-row" style="width: 100%; justify-content: space-between;">
             <div class="filter-left">
               <input type="text" class="form-control" id="att-filter-emp" placeholder="Filter by Employee ID" value="EMP-007" style="max-width: 220px;">
               <button type="button" class="btn btn-secondary btn-sm" onclick="app.loadAttendanceView()">Apply Filter</button>
             </div>
+            <div id="att-day-metrics" style="display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem;"></div>
           </div>
         </div>
 
@@ -489,12 +583,41 @@
                 <th>Clock In</th>
                 <th>Clock Out</th>
                 <th>Hours</th>
-                <th>Status</th>
+                <th>Status / Metrics</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody id="attendance-table-body">
               <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Regularization Requests Queue -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Attendance Regularization Requests</h3>
+            <span class="card-subtitle">Self-service correction applications submitted by employees</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="app.loadRegularizations()">↻ Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Req ID</th>
+                <th>Employee</th>
+                <th>Date</th>
+                <th>Requested Times</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="regularization-table-body">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading regularization requests...</td></tr>
             </tbody>
           </table>
         </div>
@@ -545,11 +668,48 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">Leave & Holiday Management</h2>
-          <p class="page-desc">Employee self-service time off requests and company calendar</p>
+          <p class="page-desc">Employee self-service time off requests, annual quotas and company calendar</p>
         </div>
         <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary" id="btn-adjust-quota" data-open-modal="modal-allocate-leave" style="display: none;">⚖️ Adjust Quota (HR)</button>
           <button type="button" class="btn btn-secondary" data-open-modal="modal-holiday">+ Add Holiday</button>
           <button type="button" class="btn btn-primary" data-open-modal="modal-leave-request">Apply for Leave</button>
+        </div>
+      </div>
+
+      <!-- Leave Quota & Balance Cards -->
+      <div class="quota-grid" id="leave-quota-cards">
+        <div class="quota-card">
+          <div class="quota-card-header">
+            <span class="quota-title">Annual Leave (PL)</span>
+            <span class="badge badge-success">Active</span>
+          </div>
+          <div class="quota-remaining" id="quota-val-annual">—</div>
+          <span class="quota-sub" id="quota-sub-annual">Loading quota...</span>
+        </div>
+        <div class="quota-card">
+          <div class="quota-card-header">
+            <span class="quota-title">Casual Leave (CL)</span>
+            <span class="badge badge-success">Active</span>
+          </div>
+          <div class="quota-remaining" id="quota-val-casual">—</div>
+          <span class="quota-sub" id="quota-sub-casual">Loading quota...</span>
+        </div>
+        <div class="quota-card">
+          <div class="quota-card-header">
+            <span class="quota-title">Sick Leave (SL)</span>
+            <span class="badge badge-success">Active</span>
+          </div>
+          <div class="quota-remaining" id="quota-val-sick">—</div>
+          <span class="quota-sub" id="quota-sub-sick">Loading quota...</span>
+        </div>
+        <div class="quota-card">
+          <div class="quota-card-header">
+            <span class="quota-title">Other / Comp-Off</span>
+            <span class="badge badge-secondary">Tracked</span>
+          </div>
+          <div class="quota-remaining" id="quota-val-other">—</div>
+          <span class="quota-sub" id="quota-sub-other">Loading quota...</span>
         </div>
       </div>
 
@@ -671,6 +831,43 @@
               </tr>
             </thead>
             <tbody id="audit-table-body">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         VIEW 7: TENANT ORGANIZATIONS (Super-Admin / Admin)
+         =================================================================== -->
+    <section class="tab-view" id="view-tenants">
+      <div class="page-head" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <div>
+          <h2 class="page-title">Tenant Organizations</h2>
+          <p class="page-desc">Multi-tenant client accounts, custom shift configurations, and compliance parameters.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-tenants">Refresh</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-open-onboard-tenant">+ Onboard Organization</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tenant ID</th>
+                <th>Organization Name</th>
+                <th>HR / Contact Email</th>
+                <th>Status</th>
+                <th>Timezone</th>
+                <th>Policy Thresholds</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+            <tbody id="tenants-table-body">
               <!-- Populated by JS -->
             </tbody>
           </table>
@@ -876,6 +1073,173 @@
         <div class="modal-foot">
           <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
           <button type="submit" class="btn btn-primary">Execute Audit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 7: Employee Attendance Regularization Request -->
+  <div class="modal-backdrop" id="modal-employee-regularize">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 class="modal-title">Request Attendance Regularization</h3>
+        <button class="modal-close" data-close-modal>×</button>
+      </div>
+      <form id="regularization-request-form">
+        <div class="modal-body">
+          <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Submit this request if you forgot to clock in/out or had an offsite assignment. Once approved by HR, your attendance will be updated.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="reg-req-emp-id">Employee ID</label>
+            <input type="text" class="form-control" id="reg-req-emp-id" placeholder="EMP-007" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-req-date">Date</label>
+            <input type="date" class="form-control" id="reg-req-date" required>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="reg-req-entry">Actual In Time</label>
+              <input type="text" class="form-control" id="reg-req-entry" placeholder="09:30" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reg-req-exit">Actual Out Time</label>
+              <input type="text" class="form-control" id="reg-req-exit" placeholder="18:30" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-req-reason">Reason</label>
+            <select class="form-control" id="reg-req-reason" required>
+              <option value="forgot_punch">Forgot to Clock In / Out</option>
+              <option value="onsite_visit">Onsite Client Meeting / Field Visit</option>
+              <option value="biometric_error">Biometric Reader Device Glitch</option>
+              <option value="technical_glitch">Portal / Network Error</option>
+              <option value="emergency">Personal Medical Emergency</option>
+              <option value="other">Other Business Justification</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-req-notes">Explanation / Notes</label>
+            <textarea class="form-control" id="reg-req-notes" rows="2" placeholder="Briefly describe what happened..." style="resize: vertical;"></textarea>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit for Approval</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 8: Allocate Leave Quota (HR) -->
+  <div class="modal-backdrop" id="modal-allocate-leave">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 class="modal-title">Adjust Leave Quota (HR)</h3>
+        <button class="modal-close" data-close-modal>×</button>
+      </div>
+      <form id="allocate-leave-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="alloc-emp-id">Employee ID</label>
+            <input type="text" class="form-control" id="alloc-emp-id" placeholder="EMP-007" required>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="alloc-year">Year</label>
+              <input type="number" class="form-control" id="alloc-year" value="2026" min="2020" max="2050" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="alloc-type">Leave Type</label>
+              <select class="form-control" id="alloc-type" required>
+                <option value="annual">Annual Leave (PL)</option>
+                <option value="casual">Casual Leave (CL)</option>
+                <option value="sick">Sick Leave (SL)</option>
+                <option value="other">Comp-Off / Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="alloc-days">Allocated Days</label>
+            <input type="number" step="0.5" min="0" max="365" class="form-control" id="alloc-days" placeholder="e.g. 15.0" required>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Quota</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Onboard Tenant Organization -->
+  <div class="modal-backdrop" id="modal-onboard-tenant">
+    <div class="modal-dialog" style="max-width: 580px;">
+      <div class="modal-head">
+        <h3 class="modal-title">Onboard Organization (Multi-Tenancy)</h3>
+        <button class="modal-close" data-close-modal>×</button>
+      </div>
+      <form id="onboard-tenant-form">
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="tenant-id-input">Tenant ID (Slug)</label>
+              <input type="text" class="form-control" id="tenant-id-input" placeholder="e.g. acme-corp" pattern="^[a-z0-9_-]+$" required>
+              <small style="color: var(--text-muted); font-size: 0.72rem;">Lowercase letters, numbers, hyphens</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tenant-name-input">Organization Name</label>
+              <input type="text" class="form-control" id="tenant-name-input" placeholder="e.g. Acme Corporation" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="tenant-email-input">Primary Contact / HR Email</label>
+            <input type="email" class="form-control" id="tenant-email-input" placeholder="hr@acme.com" required>
+          </div>
+
+          <div style="background: var(--bg-hover); padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 1rem; border: 1px solid var(--border-color);">
+            <h4 style="font-size: 0.82rem; font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary);">Initial Organization Admin (Optional)</h4>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="tenant-admin-user">Admin Username</label>
+                <input type="text" class="form-control" id="tenant-admin-user" placeholder="acme_admin">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="tenant-admin-pwd">Admin Password</label>
+                <input type="password" class="form-control" id="tenant-admin-pwd" placeholder="Min 6 characters">
+              </div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-hover); padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 0.5rem; border: 1px solid var(--border-color);">
+            <h4 style="font-size: 0.82rem; font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">Custom Policy Settings</h4>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="tenant-tz">Timezone</label>
+                <input type="text" class="form-control" id="tenant-tz" value="Asia/Kolkata">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="tenant-min-days">Min Days / Week</label>
+                <input type="number" class="form-control" id="tenant-min-days" value="3" min="1" max="7">
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="tenant-min-hours">Min Hours / Week</label>
+                <input type="number" step="0.5" class="form-control" id="tenant-min-hours" value="15.0">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="tenant-min-avg">Daily Min Average (Hours)</label>
+                <input type="number" step="0.5" class="form-control" id="tenant-min-avg" value="5.0">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-onboard-tenant">Provision Organization</button>
         </div>
       </form>
     </div>

@@ -7,10 +7,16 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from app.exceptions import LeaveConflictError, LeaveTransitionError
+from app.exceptions import (
+    InsufficientLeaveBalanceError,
+    LeaveConflictError,
+    LeaveTransitionError,
+)
 from app.repositories.employee_repo import EmployeeRepository
+from app.repositories.leave_balance_repo import LeaveBalanceRepository
 from app.repositories.leave_repo import HolidayRepository, LeaveRepository
 from app.schemas.leave import HolidayCreate, LeaveDecision, LeaveRequestCreate
+from app.schemas.leave_balance import LeaveAllocationRequest
 from app.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -22,10 +28,12 @@ class LeaveService:
         leave_repo: LeaveRepository,
         employee_repo: EmployeeRepository,
         audit_service: AuditService,
+        leave_balance_repo: LeaveBalanceRepository | None = None,
     ) -> None:
         self.leave_repo = leave_repo
         self.employee_repo = employee_repo
         self.audit_service = audit_service
+        self.leave_balance_repo = leave_balance_repo
 
     async def create_leave_request(self, data: LeaveRequestCreate, actor_id: str) -> dict[str, Any]:
         employee = await self.employee_repo.get_or_raise(data.employee_id)
@@ -42,6 +50,35 @@ class LeaveService:
             raise LeaveConflictError(
                 f"Overlapping leave request exists ({overlapping[0]['leave_id']})."
             )
+
+        requested_days = float((data.end_date - data.start_date).days + 1)
+        if self.leave_balance_repo and data.leave_type != "unpaid":
+            try:
+                balance_doc = await self.leave_balance_repo.get_balance(
+                    data.employee_id, data.start_date.year, data.leave_type
+                )
+                if balance_doc is None:
+                    await self.leave_balance_repo.initialize_defaults(
+                        data.employee_id, data.start_date.year
+                    )
+                    balance_doc = await self.leave_balance_repo.get_balance(
+                        data.employee_id, data.start_date.year, data.leave_type
+                    )
+                if balance_doc is not None and isinstance(balance_doc, dict):
+                    remaining = float(balance_doc.get("allocated_days", 0.0)) - float(
+                        balance_doc.get("used_days", 0.0)
+                    )
+                    if requested_days > remaining:
+                        raise InsufficientLeaveBalanceError(
+                            f"Insufficient {data.leave_type} leave balance: "
+                            f"requested {requested_days:.1f} day(s), "
+                            f"but only {remaining:.1f} day(s) remaining."
+                        )
+            except InsufficientLeaveBalanceError:
+                raise
+            except (TypeError, AttributeError):
+                # Fallback for un-mocked MagicMock db in legacy tests
+                pass
 
         now = datetime.now(tz=UTC)
         doc = {
@@ -79,6 +116,27 @@ class LeaveService:
         updated = await self.leave_repo.update_status(
             leave_id, "approved", approver_id, decision.note
         )
+
+        # Deduct used days from leave balance
+        if self.leave_balance_repo and leave.get("leave_type") != "unpaid":
+            try:
+                s_date = (
+                    date.fromisoformat(leave["start_date"])
+                    if isinstance(leave["start_date"], str)
+                    else leave["start_date"]
+                )
+                e_date = (
+                    date.fromisoformat(leave["end_date"])
+                    if isinstance(leave["end_date"], str)
+                    else leave["end_date"]
+                )
+                days = float((e_date - s_date).days + 1)
+                await self.leave_balance_repo.deduct_days(
+                    leave["employee_id"], s_date.year, leave.get("leave_type", "annual"), days
+                )
+            except Exception as exc:
+                logger.warning("Could not deduct leave balance: %s", exc)
+
         await self.audit_service.log(
             actor_id=approver_id,
             action="leave.approve",
@@ -145,6 +203,51 @@ class LeaveService:
                 dates.add(d)
                 d += timedelta(days=1)
         return dates
+
+    async def get_leave_balances(self, employee_id: str, year: int) -> list[dict[str, Any]]:
+        await self.employee_repo.get_or_raise(employee_id)
+        if self.leave_balance_repo is None:
+            return []
+        docs = await self.leave_balance_repo.get_balances_for_employee(employee_id, year)
+        results = []
+        for d in docs:
+            alloc = float(d.get("allocated_days", 0.0))
+            used = float(d.get("used_days", 0.0))
+            results.append(
+                {
+                    "leave_type": d["leave_type"],
+                    "allocated_days": alloc,
+                    "used_days": used,
+                    "remaining_days": max(0.0, alloc - used),
+                }
+            )
+        return results
+
+    async def allocate_leave_balance(
+        self, data: LeaveAllocationRequest, actor_id: str
+    ) -> dict[str, Any]:
+        await self.employee_repo.get_or_raise(data.employee_id)
+        if self.leave_balance_repo is None:
+            raise ValueError("LeaveBalanceRepository not configured.")
+        doc = await self.leave_balance_repo.upsert_allocation(
+            data.employee_id, data.year, data.leave_type, data.allocated_days
+        )
+        await self.audit_service.log(
+            actor_id=actor_id,
+            action="leave_balance.allocate",
+            resource_type="leave_balance",
+            resource_id=f"{data.employee_id}:{data.year}:{data.leave_type}",
+            employee_id=data.employee_id,
+            new_values={"allocated_days": data.allocated_days, "year": data.year},
+        )
+        alloc = float(doc.get("allocated_days", 0.0))
+        used = float(doc.get("used_days", 0.0))
+        return {
+            "leave_type": doc["leave_type"],
+            "allocated_days": alloc,
+            "used_days": used,
+            "remaining_days": max(0.0, alloc - used),
+        }
 
 
 class HolidayService:

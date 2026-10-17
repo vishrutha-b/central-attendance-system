@@ -1,4 +1,4 @@
-"""Employee repository — async MongoDB CRUD."""
+"""Employee repository — async MongoDB CRUD with multi-tenant isolation."""
 
 from __future__ import annotations
 
@@ -15,10 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class EmployeeRepository:
-    def __init__(self, db: Any) -> None:
+    def __init__(self, db: Any, tenant_id: str = "default") -> None:
         self.col = db.employees
+        self.tenant_id = tenant_id
 
     async def create(self, doc: dict[str, Any]) -> dict[str, Any]:
+        doc["tenant_id"] = self.tenant_id
         try:
             await self.col.insert_one(doc)
             return doc
@@ -27,10 +29,16 @@ class EmployeeRepository:
             raise ConflictError(f"Employee with duplicate {key} already exists.") from exc
 
     async def find_by_id(self, employee_id: str) -> dict[str, Any] | None:
-        return await self.col.find_one({"employee_id": employee_id}, {"_id": 0})
+        return await self.col.find_one(
+            {"tenant_id": self.tenant_id, "employee_id": employee_id},
+            {"_id": 0},
+        )
 
     async def find_by_email(self, email: str) -> dict[str, Any] | None:
-        return await self.col.find_one({"email": email.lower()}, {"_id": 0})
+        return await self.col.find_one(
+            {"tenant_id": self.tenant_id, "email": email.lower()},
+            {"_id": 0},
+        )
 
     async def get_or_raise(self, employee_id: str) -> dict[str, Any]:
         doc = await self.find_by_id(employee_id)
@@ -46,7 +54,7 @@ class EmployeeRepository:
         is_active: bool | None = None,
         search: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        query: dict[str, Any] = {}
+        query: dict[str, Any] = {"tenant_id": self.tenant_id}
         if department:
             query["department"] = department
         if is_active is not None:
@@ -67,7 +75,7 @@ class EmployeeRepository:
         updates["updated_at"] = datetime.now(tz=UTC)
         try:
             doc = await self.col.find_one_and_update(
-                {"employee_id": employee_id},
+                {"tenant_id": self.tenant_id, "employee_id": employee_id},
                 {"$set": updates},
                 return_document=ReturnDocument.AFTER,
                 projection={"_id": 0},
@@ -84,11 +92,14 @@ class EmployeeRepository:
         return await self.update(employee_id, {"is_active": False})
 
     async def get_active_employees(self) -> list[dict[str, Any]]:
-        cursor = self.col.find({"is_active": True}, {"_id": 0}).sort("employee_id", 1)
+        cursor = self.col.find(
+            {"tenant_id": self.tenant_id, "is_active": True},
+            {"_id": 0},
+        ).sort("employee_id", 1)
         return await cursor.to_list(length=None)
 
     async def next_employee_id(self) -> str:
-        count = await self.col.count_documents({})
+        count = await self.col.count_documents({"tenant_id": self.tenant_id})
         cand_num = count + 1
         while True:
             candidate = f"EMP-{cand_num:03d}"

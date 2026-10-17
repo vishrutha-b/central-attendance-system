@@ -22,6 +22,10 @@ from app.schemas.leave import (
     LeaveRequestCreate,
     LeaveRequestResponse,
 )
+from app.schemas.leave_balance import (
+    LeaveAllocationRequest,
+    LeaveBalanceResponse,
+)
 from app.services.leave_service import HolidayService, LeaveService
 
 logger = logging.getLogger(__name__)
@@ -134,6 +138,46 @@ async def reject_leave(
     current_admin: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, Any]:
     return await service.reject_leave(leave_id, decision, approver_id=current_admin["admin_id"])
+
+
+@leave_router.get(
+    "/balances/{employee_id}",
+    response_model=LeaveBalanceResponse,
+    summary="Get employee leave balances",
+    description="Retrieve annual leave balances for an employee.",
+)
+async def get_leave_balances(
+    employee_id: str,
+    year: int = Query(default=2026, ge=2020, le=2050),
+    service: LeaveService = Depends(get_leave_service),
+    current_admin: dict[str, Any] | None = Depends(get_current_admin),
+) -> dict[str, Any]:
+    emp_clean = employee_id.strip().upper()
+    if current_admin and current_admin.get("role") == "employee":
+        user_emp_id = (
+            current_admin.get("employee_id") or current_admin.get("admin_id") or ""
+        ).upper()
+        if emp_clean != user_emp_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Employees can only view their own leave balances.",
+            )
+
+    balances = await service.get_leave_balances(emp_clean, year)
+    return {"employee_id": emp_clean, "year": year, "balances": balances}
+
+
+@leave_router.post(
+    "/balances/allocate",
+    summary="Allocate or update leave balance",
+    description="Set allocated days for an employee's leave type. Requires admin role.",
+)
+async def allocate_leave(
+    data: LeaveAllocationRequest,
+    service: LeaveService = Depends(get_leave_service),
+    current_admin: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return await service.allocate_leave_balance(data, actor_id=current_admin["admin_id"])
 
 
 # ── Holiday endpoints ─────────────────────────────────────────────────────────

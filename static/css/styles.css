@@ -1159,3 +1159,178 @@ body {
   border-color: var(--danger);
 }
 
+/* ── Live Presence Component Styles ── */
+.presence-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.presence-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+
+.presence-stat-pill.in-office {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.presence-stat-pill.on-break {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.presence-stat-pill.on-leave {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.presence-stat-pill.absent {
+  border-color: var(--border-color);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+.status-dot-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot-pulse.green {
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+}
+
+.status-dot-pulse.amber {
+  background: var(--warning);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
+}
+
+.status-dot-pulse.blue {
+  background: var(--info);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.status-dot-pulse.gray {
+  background: var(--text-subtle);
+}
+
+/* ── Leave Quota Cards ── */
+.quota-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.quota-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.quota-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.quota-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quota-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--text-main);
+}
+
+.quota-remaining {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.quota-sub {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.quota-progress {
+  height: 6px;
+  background: var(--bg-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.quota-progress-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* ── Shift Anomaly Badges ── */
+.badge-late {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-ot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--primary-subtle);
+  color: var(--primary-text);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.badge-early-exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+

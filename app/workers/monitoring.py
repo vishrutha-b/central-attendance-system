@@ -1,8 +1,8 @@
 """
-Attendance monitoring worker.
+Attendance monitoring worker with multi-tenant auditing.
 
-Identifies completed policy weeks, evaluates compliance, and sends
-violation notifications with deduplication and retry logic.
+Identifies completed policy weeks, evaluates compliance across all tenants,
+and sends violation notifications with deduplication and retry logic.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from app.repositories.admin_repo import AuditRepository, NotificationRepository
 from app.repositories.attendance_repo import AttendanceRepository
 from app.repositories.employee_repo import EmployeeRepository
 from app.repositories.leave_repo import HolidayRepository, LeaveRepository
+from app.repositories.tenant_repo import TenantRepository
 from app.services.audit_service import AuditService
 from app.services.leave_service import HolidayService, LeaveService
 from app.services.notification_service import NotificationService
@@ -31,22 +32,22 @@ logger = logging.getLogger(__name__)
 
 async def run_monitoring_cycle(
     db: Any,
+    tenant_id: str = "default",
+    custom_thresholds: PolicyThresholds | None = None,
     include_current_week: bool = False,
     force_resend: bool = False,
 ) -> dict[str, Any]:
     """
-    Run one monitoring cycle:
-    1. Find all completed policy weeks in the past N weeks (optionally include current week)
-    2. For each active employee, evaluate compliance
-    3. Send violation notifications (with deduplication unless force_resend=True)
+    Run one monitoring cycle for a specific tenant:
+    1. Find all completed policy weeks in the past N weeks
+    2. For each active employee of this tenant, evaluate compliance
+    3. Send violation notifications with deduplication
     4. Retry pending notifications that failed earlier
-
-    Returns a summary dict with counts and violation details.
     """
     settings = get_settings()
     today = date.today()
 
-    thresholds = PolicyThresholds(
+    thresholds = custom_thresholds or PolicyThresholds(
         min_days_per_week=settings.min_days_per_week,
         min_hours_per_week=settings.min_hours_per_week,
         min_avg_hours_per_day=settings.min_avg_hours_per_day,
@@ -54,13 +55,13 @@ async def run_monitoring_cycle(
         week_start_day=settings.week_start_day,
     )
 
-    employee_repo = EmployeeRepository(db)
-    attendance_repo = AttendanceRepository(db)
-    leave_repo = LeaveRepository(db)
-    holiday_repo = HolidayRepository(db)
-    notification_repo = NotificationRepository(db)
+    employee_repo = EmployeeRepository(db, tenant_id=tenant_id)
+    attendance_repo = AttendanceRepository(db, tenant_id=tenant_id)
+    leave_repo = LeaveRepository(db, tenant_id=tenant_id)
+    holiday_repo = HolidayRepository(db, tenant_id=tenant_id)
+    notification_repo = NotificationRepository(db, tenant_id=tenant_id)
     notification_svc = NotificationService()
-    audit_repo = AuditRepository(db)
+    audit_repo = AuditRepository(db, tenant_id=tenant_id)
     audit_svc = AuditService(audit_repo)
 
     leave_svc = LeaveService(leave_repo, employee_repo, audit_svc)
@@ -77,8 +78,9 @@ async def run_monitoring_cycle(
         weeks_to_check.insert(0, current_wb)
 
     if not weeks_to_check:
-        logger.info("No policy weeks to evaluate.")
+        logger.info("No policy weeks to evaluate for tenant '%s'.", tenant_id)
         return {
+            "tenant_id": tenant_id,
             "status": "no_completed_weeks",
             "checked": 0,
             "violations": 0,
@@ -87,71 +89,76 @@ async def run_monitoring_cycle(
         }
 
     logger.info(
-        "Monitoring: checking %d weeks (include_current=%s).",
+        "Monitoring tenant '%s': checking %d weeks (include_current=%s).",
+        tenant_id,
         len(weeks_to_check),
         include_current_week,
     )
 
-    # Load all active employees
+    # Load all active employees for this tenant
     employees = await employee_repo.get_active_employees()
 
     sent_count = 0
     violation_count = 0
     skipped_count = 0
-    details: list[dict[str, Any]] = []
+    details = []
 
-    for emp in employees:
-        emp_id = emp["employee_id"]
-        emp_email = emp["email"]
-        emp_name = emp["name"]
+    for week in weeks_to_check:
+        # Preload tenant holidays for this week
+        week_holidays = await holiday_svc.get_holiday_dates(
+            week.start, week.end - timedelta(days=1)
+        )
 
-        for week in weeks_to_check:
-            dedup_key = f"{emp_id}::{week.start.isoformat()}::violation"
+        for emp in employees:
+            emp_id = emp["employee_id"]
+            emp_email = emp["email"]
+            emp_name = emp.get("name", emp_id)
 
-            # Check deduplication
-            existing = await notification_repo.find_by_dedup_key(dedup_key)
-            if existing and existing.get("status") in ("sent", "exhausted") and not force_resend:
-                skipped_count += 1
-                continue
+            # Preload approved leaves for this week
+            week_leaves = await leave_svc.get_approved_leave_dates(
+                emp_id, week.start, week.end - timedelta(days=1)
+            )
 
-            # Load sessions for this week
+            # Get completed sessions for this week
             sessions = await attendance_repo.find_sessions_in_range(
                 emp_id, week.start, week.end - timedelta(days=1)
             )
 
-            # Load holidays and leave
-            holiday_dates = await holiday_svc.get_holiday_dates(
-                week.start, week.end - timedelta(days=1)
-            )
-            approved_leave = await leave_svc.get_approved_leave_dates(
-                emp_id, week.start, week.end - timedelta(days=1)
-            )
-
-            is_curr = week.start == current_wb.start
+            # Evaluate week
             result = evaluate_week(
+                employee_id=emp_id,
                 week=week,
                 sessions=sessions,
+                holidays=week_holidays,
+                leaves=week_leaves,
                 thresholds=thresholds,
-                today=today,
-                holiday_dates=holiday_dates,
-                approved_leave_dates=approved_leave,
-                force_evaluable=include_current_week and is_curr,
             )
 
-            if not result.is_evaluable:
+            if result.is_compliant:
                 continue
 
-            if result.is_compliant is True:
-                continue  # Compliant — no notification needed
-
             violation_count += 1
+            dedup_key = f"{tenant_id}:{emp_id}:{week.start.isoformat()}:weekly_violation"
 
-            # Handle retry or new notification
+            # Check if notification already sent
+            existing = await notification_repo.find_by_dedup_key(dedup_key)
+
+            if existing and existing.get("status") == "sent" and not force_resend:
+                logger.debug(
+                    "Violation notification already sent to %s for week %s (tenant: %s).",
+                    emp_id,
+                    week.start,
+                    tenant_id,
+                )
+                skipped_count += 1
+                continue
+
             if existing is None:
                 # Create new notification log
                 now = datetime.now(tz=UTC)
                 notification_id = f"NTF-{uuid.uuid4().hex[:12].upper()}"
                 notification_doc = {
+                    "tenant_id": tenant_id,
                     "notification_id": notification_id,
                     "employee_id": emp_id,
                     "employee_email_snapshot": emp_email,
@@ -178,7 +185,12 @@ async def run_monitoring_cycle(
 
             if attempt_count > settings.notification_max_retries + 1:
                 await notification_repo.update(notification_id, {"status": "exhausted"})
-                logger.warning("Notification exhausted for %s week %s", emp_id, week.start)
+                logger.warning(
+                    "Notification exhausted for %s week %s (tenant %s)",
+                    emp_id,
+                    week.start,
+                    tenant_id,
+                )
                 continue
 
             success = await notification_svc.send_violation_email(
@@ -239,6 +251,7 @@ async def run_monitoring_cycle(
     )
 
     summary = {
+        "tenant_id": tenant_id,
         "status": "completed",
         "weeks_checked": len(weeks_to_check),
         "employees_checked": len(employees),
@@ -248,8 +261,61 @@ async def run_monitoring_cycle(
         "retries_processed": retry_count,
         "details": details,
     }
-    logger.info("Monitoring cycle complete: %s", summary)
+    logger.info("Monitoring cycle for tenant '%s' complete: %s", tenant_id, summary)
     return summary
+
+
+async def run_all_tenants_monitoring_cycle(
+    db: Any,
+    include_current_week: bool = False,
+    force_resend: bool = False,
+) -> dict[str, Any]:
+    """
+    Iterate through all active tenants and execute monitoring cycle
+    with per-tenant thresholds.
+    """
+    tenant_repo = TenantRepository(db)
+    tenants, total = await tenant_repo.list_tenants(limit=500, status="active")
+    settings = get_settings()
+
+    if not tenants:
+        return await run_monitoring_cycle(
+            db,
+            tenant_id="default",
+            include_current_week=include_current_week,
+            force_resend=force_resend,
+        )
+
+    results: dict[str, Any] = {}
+    for tenant in tenants:
+        t_id = tenant["tenant_id"]
+        t_settings = tenant.get("settings", {})
+        thresholds = PolicyThresholds(
+            min_days_per_week=t_settings.get("min_days_per_week", settings.min_days_per_week),
+            min_hours_per_week=t_settings.get("min_hours_per_week", settings.min_hours_per_week),
+            min_avg_hours_per_day=t_settings.get(
+                "min_avg_hours_per_day", settings.min_avg_hours_per_day
+            ),
+            working_days_per_week=t_settings.get(
+                "working_days_per_week", settings.working_days_per_week
+            ),
+            week_start_day=t_settings.get("week_start_day", settings.week_start_day),
+        )
+
+        res = await run_monitoring_cycle(
+            db,
+            tenant_id=t_id,
+            custom_thresholds=thresholds,
+            include_current_week=include_current_week,
+            force_resend=force_resend,
+        )
+        results[t_id] = res
+
+    return {
+        "status": "completed",
+        "tenants_audited": len(tenants),
+        "results": results,
+    }
 
 
 def _get_completed_weeks(today: date, week_start_day: int, lookback_weeks: int = 4) -> list[Any]:

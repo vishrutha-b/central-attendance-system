@@ -1,4 +1,4 @@
-"""Authentication routes."""
+"""Authentication routes with multi-tenant support."""
 
 from __future__ import annotations
 
@@ -39,6 +39,13 @@ async def login(
     employee_repo: EmployeeRepository = Depends(get_employee_repo),
 ) -> dict[str, Any]:
     username_clean = data.username.strip()
+    active_tenant_id = data.tenant_id or admin_repo.tenant_id
+
+    # If login request passed an explicit tenant_id different from dependency
+    if data.tenant_id and data.tenant_id != admin_repo.tenant_id:
+        admin_repo.tenant_id = data.tenant_id
+        employee_repo.tenant_id = data.tenant_id
+        active_tenant_id = data.tenant_id
 
     # 1. Try Administrator account
     admin = await admin_repo.find_by_username(username_clean)
@@ -56,10 +63,20 @@ async def login(
             )
 
         token, expires_in = create_access_token(
-            {"sub": admin["admin_id"], "role": admin["role"], "username": admin["username"]}
+            {
+                "sub": admin["admin_id"],
+                "role": admin["role"],
+                "username": admin["username"],
+                "tenant_id": admin.get("tenant_id") or active_tenant_id,
+            }
         )
-        logger.info("Admin '%s' logged in.", admin["username"])
-        return {"access_token": token, "token_type": "bearer", "expires_in": expires_in}
+        logger.info("Admin '%s' logged in (tenant: %s).", admin["username"], active_tenant_id)
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": expires_in,
+            "tenant_id": active_tenant_id,
+        }
 
     # 2. Try Employee account (by ID or Email)
     emp = None
@@ -98,10 +115,16 @@ async def login(
                 "employee_id": emp["employee_id"],
                 "name": emp["name"],
                 "email": emp["email"],
+                "tenant_id": emp.get("tenant_id") or active_tenant_id,
             }
         )
-        logger.info("Employee '%s' logged in.", emp["employee_id"])
-        return {"access_token": token, "token_type": "bearer", "expires_in": expires_in}
+        logger.info("Employee '%s' logged in (tenant: %s).", emp["employee_id"], active_tenant_id)
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": expires_in,
+            "tenant_id": active_tenant_id,
+        }
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -121,11 +144,15 @@ async def register_admin(
     admin_repo: AdminRepository = Depends(get_admin_repo),
 ) -> dict[str, Any]:
     username_clean = data.username.strip()
+    active_tenant_id = data.tenant_id or admin_repo.tenant_id
+    if data.tenant_id and data.tenant_id != admin_repo.tenant_id:
+        admin_repo.tenant_id = data.tenant_id
+
     existing_user = await admin_repo.find_by_username(username_clean)
     if existing_user is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Administrator username '{username_clean}' is already taken.",
+            detail=f"Administrator username '{username_clean}' is already taken for this tenant.",
         )
 
     email_clean = data.email.lower().strip()
@@ -133,7 +160,7 @@ async def register_admin(
     if existing_email is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Administrator email '{data.email}' is already registered.",
+            detail=f"Administrator email '{data.email}' is already registered for this tenant.",
         )
 
     now = datetime.now(tz=UTC)
@@ -146,16 +173,27 @@ async def register_admin(
         "hashed_password": hash_password(data.password),
         "role": "admin",
         "is_active": True,
+        "tenant_id": active_tenant_id,
         "created_at": now,
         "updated_at": now,
     }
     await admin_repo.create(doc)
-    logger.info("New admin '%s' registered.", username_clean)
+    logger.info("New admin '%s' registered for tenant '%s'.", username_clean, active_tenant_id)
 
     token, expires_in = create_access_token(
-        {"sub": admin_id, "role": "admin", "username": username_clean}
+        {
+            "sub": admin_id,
+            "role": "admin",
+            "username": username_clean,
+            "tenant_id": active_tenant_id,
+        }
     )
-    return {"access_token": token, "token_type": "bearer", "expires_in": expires_in}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": expires_in,
+        "tenant_id": active_tenant_id,
+    }
 
 
 @router.post(
@@ -169,6 +207,10 @@ async def register_employee(
     data: EmployeeRegisterRequest,
     employee_repo: EmployeeRepository = Depends(get_employee_repo),
 ) -> dict[str, Any]:
+    active_tenant_id = data.tenant_id or employee_repo.tenant_id
+    if data.tenant_id and data.tenant_id != employee_repo.tenant_id:
+        employee_repo.tenant_id = data.tenant_id
+
     emp_id = data.employee_id.strip().upper() if data.employee_id else None
     if not emp_id or emp_id == "STRING":
         emp_id = await employee_repo.next_employee_id()
@@ -200,7 +242,10 @@ async def register_employee(
         if existing_by_email is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Email '{email_clean}' is already registered for another employee.",
+                detail=(
+                    f"Email '{email_clean}' is already registered "
+                    "for another employee in this tenant."
+                ),
             )
 
         doc = {
@@ -210,12 +255,13 @@ async def register_employee(
             "department": data.department.strip(),
             "role": "Employee",
             "is_active": True,
+            "tenant_id": active_tenant_id,
             "hashed_password": hash_password(data.password),
             "created_at": now,
             "updated_at": now,
         }
         await employee_repo.create(doc)
-        logger.info("New employee '%s' registered with their chosen password.", emp_id)
+        logger.info("New employee '%s' registered for tenant '%s'.", emp_id, active_tenant_id)
 
     token, expires_in = create_access_token(
         {
@@ -225,9 +271,15 @@ async def register_employee(
             "employee_id": emp_id,
             "name": data.name.strip(),
             "email": email_clean,
+            "tenant_id": active_tenant_id,
         }
     )
-    return {"access_token": token, "token_type": "bearer", "expires_in": expires_in}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": expires_in,
+        "tenant_id": active_tenant_id,
+    }
 
 
 @router.get(

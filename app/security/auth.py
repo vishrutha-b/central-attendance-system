@@ -1,4 +1,4 @@
-"""JWT token creation and validation."""
+"""JWT token creation and validation with multi-tenant claim support."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def create_access_token(payload: dict[str, Any]) -> tuple[str, int]:
     """
-    Create a signed JWT access token.
+    Create a signed JWT access token with embedded tenant_id.
 
     Returns (token_str, expires_in_seconds).
     """
@@ -25,6 +25,7 @@ def create_access_token(payload: dict[str, Any]) -> tuple[str, int]:
     expire = now + timedelta(minutes=settings.jwt_expiry_minutes)
 
     data = payload.copy()
+    data.setdefault("tenant_id", "default")
     data.update({"exp": expire, "iat": now})
 
     token = jwt.encode(data, settings.jwt_secret, algorithm=settings.jwt_algorithm)

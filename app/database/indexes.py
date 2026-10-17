@@ -1,4 +1,4 @@
-"""MongoDB index initialization — idempotent and safe to run on every startup."""
+"""MongoDB index initialization — idempotent and safe to run on every startup with multi-tenancy."""
 
 from __future__ import annotations
 
@@ -11,9 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 async def create_indexes(db: Any) -> None:
-    """Create all required indexes. Safe to call multiple times."""
-    logger.info("Initializing MongoDB indexes…")
+    """Create all required indexes with multi-tenant keys. Safe to call multiple times."""
+    logger.info("Initializing multi-tenant MongoDB indexes…")
 
+    await _create_tenants_indexes(db)
     await _create_employees_indexes(db)
     await _create_attendance_indexes(db)
     await _create_leave_indexes(db)
@@ -21,18 +22,48 @@ async def create_indexes(db: Any) -> None:
     await _create_notification_indexes(db)
     await _create_audit_indexes(db)
     await _create_admin_indexes(db)
+    await _create_regularization_indexes(db)
+    await _create_leave_balance_indexes(db)
 
-    logger.info("Index initialization complete.")
+    logger.info("Multi-tenant index initialization complete.")
+
+
+async def _create_tenants_indexes(db: Any) -> None:
+    collection = db.tenants
+    indexes = [
+        IndexModel([("tenant_id", ASCENDING)], unique=True, name="uq_tenant_id"),
+        IndexModel([("status", ASCENDING)], name="idx_tenant_status"),
+        IndexModel([("contact_email", ASCENDING)], name="idx_tenant_contact_email"),
+    ]
+    await collection.create_indexes(indexes)
+    logger.debug("tenants indexes created.")
 
 
 async def _create_employees_indexes(db: Any) -> None:
     collection = db.employees
     indexes = [
-        IndexModel([("employee_id", ASCENDING)], unique=True, name="uq_employee_id"),
-        IndexModel([("email", ASCENDING)], unique=True, name="uq_employee_email"),
-        IndexModel([("department", ASCENDING)], name="idx_employee_department"),
-        IndexModel([("is_active", ASCENDING)], name="idx_employee_active"),
-        IndexModel([("name", ASCENDING)], name="idx_employee_name"),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("employee_id", ASCENDING)],
+            unique=True,
+            name="uq_tenant_employee_id",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("email", ASCENDING)],
+            unique=True,
+            name="uq_tenant_employee_email",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("department", ASCENDING)],
+            name="idx_tenant_emp_dept",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("is_active", ASCENDING)],
+            name="idx_tenant_emp_active",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("name", ASCENDING)],
+            name="idx_tenant_emp_name",
+        ),
     ]
     await collection.create_indexes(indexes)
     logger.debug("employees indexes created.")
@@ -41,18 +72,36 @@ async def _create_employees_indexes(db: Any) -> None:
 async def _create_attendance_indexes(db: Any) -> None:
     collection = db.attendance
     indexes = [
-        IndexModel([("attendance_id", ASCENDING)], unique=True, name="uq_attendance_id"),
         IndexModel(
-            [("employee_id", ASCENDING), ("date", ASCENDING)],
-            name="idx_attendance_emp_date",
+            [("tenant_id", ASCENDING), ("attendance_id", ASCENDING)],
+            unique=True,
+            name="uq_tenant_attendance_id",
         ),
         IndexModel(
-            [("employee_id", ASCENDING), ("date", ASCENDING), ("entry_time", ASCENDING)],
-            name="idx_attendance_emp_date_entry",
+            [("tenant_id", ASCENDING), ("employee_id", ASCENDING), ("date", ASCENDING)],
+            name="idx_tenant_att_emp_date",
         ),
-        IndexModel([("attendance_status", ASCENDING)], name="idx_attendance_status"),
-        IndexModel([("date", ASCENDING)], name="idx_attendance_date"),
-        IndexModel([("employee_id", ASCENDING)], name="idx_attendance_employee"),
+        IndexModel(
+            [
+                ("tenant_id", ASCENDING),
+                ("employee_id", ASCENDING),
+                ("date", ASCENDING),
+                ("entry_time", ASCENDING),
+            ],
+            name="idx_tenant_att_emp_date_entry",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("attendance_status", ASCENDING)],
+            name="idx_tenant_att_status",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("date", ASCENDING)],
+            name="idx_tenant_att_date",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("employee_id", ASCENDING)],
+            name="idx_tenant_att_emp",
+        ),
     ]
     await collection.create_indexes(indexes)
     logger.debug("attendance indexes created.")
@@ -61,14 +110,32 @@ async def _create_attendance_indexes(db: Any) -> None:
 async def _create_leave_indexes(db: Any) -> None:
     collection = db.leave_requests
     indexes = [
-        IndexModel([("leave_id", ASCENDING)], unique=True, name="uq_leave_id"),
-        IndexModel([("employee_id", ASCENDING)], name="idx_leave_employee"),
         IndexModel(
-            [("employee_id", ASCENDING), ("start_date", ASCENDING), ("end_date", ASCENDING)],
-            name="idx_leave_emp_dates",
+            [("tenant_id", ASCENDING), ("leave_id", ASCENDING)],
+            unique=True,
+            name="uq_tenant_leave_id",
         ),
-        IndexModel([("status", ASCENDING)], name="idx_leave_status"),
-        IndexModel([("start_date", ASCENDING)], name="idx_leave_start"),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("employee_id", ASCENDING)],
+            name="idx_tenant_leave_employee",
+        ),
+        IndexModel(
+            [
+                ("tenant_id", ASCENDING),
+                ("employee_id", ASCENDING),
+                ("start_date", ASCENDING),
+                ("end_date", ASCENDING),
+            ],
+            name="idx_tenant_leave_emp_dates",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("status", ASCENDING)],
+            name="idx_tenant_leave_status",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("start_date", ASCENDING)],
+            name="idx_tenant_leave_start",
+        ),
     ]
     await collection.create_indexes(indexes)
     logger.debug("leave_requests indexes created.")
@@ -77,9 +144,20 @@ async def _create_leave_indexes(db: Any) -> None:
 async def _create_holidays_indexes(db: Any) -> None:
     collection = db.holidays
     indexes = [
-        IndexModel([("holiday_id", ASCENDING)], unique=True, name="uq_holiday_id"),
-        IndexModel([("date", ASCENDING)], unique=True, name="uq_holiday_date"),
-        IndexModel([("name", ASCENDING)], name="idx_holiday_name"),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("holiday_id", ASCENDING)],
+            unique=True,
+            name="uq_tenant_holiday_id",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("date", ASCENDING)],
+            unique=True,
+            name="uq_tenant_holiday_date",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("name", ASCENDING)],
+            name="idx_tenant_holiday_name",
+        ),
     ]
     await collection.create_indexes(indexes)
     logger.debug("holidays indexes created.")
@@ -88,11 +166,28 @@ async def _create_holidays_indexes(db: Any) -> None:
 async def _create_notification_indexes(db: Any) -> None:
     collection = db.notification_logs
     indexes = [
-        IndexModel([("notification_id", ASCENDING)], unique=True, name="uq_notification_id"),
-        IndexModel([("dedup_key", ASCENDING)], unique=True, name="uq_notification_dedup"),
-        IndexModel([("status", ASCENDING)], name="idx_notification_status"),
-        IndexModel([("next_retry_at", ASCENDING)], name="idx_notification_retry"),
-        IndexModel([("employee_id", ASCENDING)], name="idx_notification_employee"),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("notification_id", ASCENDING)],
+            unique=True,
+            name="uq_tenant_notif_id",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("dedup_key", ASCENDING)],
+            unique=True,
+            name="uq_tenant_notif_dedup",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("status", ASCENDING)],
+            name="idx_tenant_notif_status",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("next_retry_at", ASCENDING)],
+            name="idx_tenant_notif_retry",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("employee_id", ASCENDING)],
+            name="idx_tenant_notif_employee",
+        ),
     ]
     await collection.create_indexes(indexes)
     logger.debug("notification_logs indexes created.")
@@ -101,12 +196,31 @@ async def _create_notification_indexes(db: Any) -> None:
 async def _create_audit_indexes(db: Any) -> None:
     collection = db.audit_logs
     indexes = [
-        IndexModel([("audit_id", ASCENDING)], unique=True, name="uq_audit_id"),
-        IndexModel([("timestamp", DESCENDING)], name="idx_audit_timestamp"),
-        IndexModel([("actor_id", ASCENDING)], name="idx_audit_actor"),
-        IndexModel([("resource_type", ASCENDING)], name="idx_audit_resource_type"),
-        IndexModel([("resource_id", ASCENDING)], name="idx_audit_resource"),
-        IndexModel([("employee_id", ASCENDING)], name="idx_audit_employee"),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("audit_id", ASCENDING)],
+            unique=True,
+            name="uq_tenant_audit_id",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("timestamp", DESCENDING)],
+            name="idx_tenant_audit_timestamp",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("actor_id", ASCENDING)],
+            name="idx_tenant_audit_actor",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("resource_type", ASCENDING)],
+            name="idx_tenant_audit_res_type",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("resource_id", ASCENDING)],
+            name="idx_tenant_audit_res_id",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("employee_id", ASCENDING)],
+            name="idx_tenant_audit_employee",
+        ),
     ]
     await collection.create_indexes(indexes)
     logger.debug("audit_logs indexes created.")
@@ -115,10 +229,72 @@ async def _create_audit_indexes(db: Any) -> None:
 async def _create_admin_indexes(db: Any) -> None:
     collection = db.admin_users
     indexes = [
-        IndexModel([("admin_id", ASCENDING)], unique=True, name="uq_admin_id"),
-        IndexModel([("username", ASCENDING)], unique=True, name="uq_admin_username"),
-        IndexModel([("email", ASCENDING)], unique=True, name="uq_admin_email"),
-        IndexModel([("is_active", ASCENDING)], name="idx_admin_active"),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("admin_id", ASCENDING)],
+            unique=True,
+            name="uq_tenant_admin_id",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("username", ASCENDING)],
+            unique=True,
+            name="uq_tenant_admin_username",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("email", ASCENDING)],
+            unique=True,
+            name="uq_tenant_admin_email",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("is_active", ASCENDING)],
+            name="idx_tenant_admin_active",
+        ),
     ]
     await collection.create_indexes(indexes)
     logger.debug("admin_users indexes created.")
+
+
+async def _create_regularization_indexes(db: Any) -> None:
+    collection = db.regularization_requests
+    indexes = [
+        IndexModel(
+            [("tenant_id", ASCENDING), ("request_id", ASCENDING)],
+            unique=True,
+            name="uq_tenant_reg_id",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("employee_id", ASCENDING), ("date", ASCENDING)],
+            name="idx_tenant_reg_emp_date",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("status", ASCENDING)],
+            name="idx_tenant_reg_status",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("created_at", DESCENDING)],
+            name="idx_tenant_reg_created",
+        ),
+    ]
+    await collection.create_indexes(indexes)
+    logger.debug("regularization_requests indexes created.")
+
+
+async def _create_leave_balance_indexes(db: Any) -> None:
+    collection = db.leave_balances
+    indexes = [
+        IndexModel(
+            [
+                ("tenant_id", ASCENDING),
+                ("employee_id", ASCENDING),
+                ("year", ASCENDING),
+                ("leave_type", ASCENDING),
+            ],
+            unique=True,
+            name="uq_tenant_leave_bal_emp_yr_type",
+        ),
+        IndexModel(
+            [("tenant_id", ASCENDING), ("employee_id", ASCENDING)],
+            name="idx_tenant_leave_bal_emp",
+        ),
+    ]
+    await collection.create_indexes(indexes)
+    logger.debug("leave_balances indexes created.")

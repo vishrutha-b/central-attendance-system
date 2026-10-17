@@ -413,28 +413,50 @@ Go to **`POST /api/v1/admin/monitoring/run`**:
 
 ## 8. MongoDB Database Collections
 
-| Collection | Description | Key Fields |
+All collections enforce strict data isolation via a composite index prepending `tenant_id`:
+
+| Collection | Description | Key Fields & Composite Unique Indexes |
 | :--- | :--- | :--- |
-| `employees` | Registered workforce | `employee_id`, `name`, `email`, `department`, `role`, `is_active` |
-| `attendance` | Work session records | `attendance_id`, `employee_id`, `date`, `entry_time`, `exit_time`, `total_hours`, `attendance_status` |
-| `leave_requests`| Employee leave requests | `leave_id`, `employee_id`, `leave_type`, `start_date`, `end_date`, `status`, `reason`, `reviewed_by` |
-| `holidays` | Company holidays | `holiday_id`, `name`, `date`, `description` |
-| `notification_logs`| Email delivery audit | `notification_id`, `employee_id`, `dedup_key`, `status`, `attempt_count`, `last_attempt_at` |
-| `audit_logs` | Immutable security trail | `audit_id`, `timestamp`, `actor_id`, `action`, `resource_type`, `resource_id`, `new_values` |
-| `admin_users` | Admin & manager logins | `admin_id`, `username`, `email`, `hashed_password`, `role`, `is_active` |
+| `tenants` | Tenant Organizations | `tenant_id` (Unique), `name`, `contact_email`, `settings`, `is_active` |
+| `employees` | Registered workforce | Compound index: `(tenant_id, employee_id)` (Unique), `(tenant_id, email)` (Unique) |
+| `attendance` | Work session records | Compound index: `(tenant_id, employee_id, date)` |
+| `leave_requests`| Employee leave requests | Compound index: `(tenant_id, employee_id, start_date)` |
+| `leave_balances`| Annual leave quotas | Compound index: `(tenant_id, employee_id, year, leave_type)` (Unique) |
+| `regularization_requests`| Timesheet corrections | Compound index: `(tenant_id, employee_id, date)` |
+| `holidays` | Company holidays | Compound index: `(tenant_id, date)` (Unique) |
+| `notification_logs`| Email delivery audit | Compound index: `(tenant_id, dedup_key)` (Unique) |
+| `audit_logs` | Immutable security trail | Compound index: `(tenant_id, timestamp)` |
+| `admin_users` | Admin & manager logins | Compound index: `(tenant_id, username)` (Unique) |
 
 ---
 
-## 9. Quality Assurance & Tests
+## 9. Multi-Tenancy Architecture (Shared Database Model)
 
-The project includes **39 automated tests** covering security, token authentication, API endpoints, deterministic policy math, and automatic email dispatching.
+### Tenant Isolation & Resolution
+- **Tenant Context (`ContextVar`)**: The active tenant is tracked request-scoped via `app/core/tenant.py`.
+- **Resolution Strategy**:
+  1. `X-Tenant-ID` HTTP header (takes precedence for API clients / frontend).
+  2. JWT `tenant_id` claim if authenticated.
+  3. Default fallback: `"default"` (ensuring full backward compatibility).
+- **Tenant Onboarding (Controlled Admin Provisioning - Option 2)**:
+  - Restricted to administrators via `require_admin`.
+  - Endpoint: `POST /api/v1/tenants`
+  - In a single atomic step, provisions the organization (`tenant_id`, `name`, `contact_email`, customized policy thresholds like `min_days_per_week`, `min_hours_per_week`, `daily_min_average_hours`) and creates the initial organization administrator credentials.
+- **Cross-Tenant Worker Monitoring**:
+  - The APScheduler worker runs `run_all_tenants_monitoring_cycle()` which iterates each active tenant in the database, scopes repositories to that tenant, and applies that tenant's custom policy thresholds.
+
+---
+
+## 10. Quality Assurance & Tests
+
+The project includes **55 automated tests** covering security, token authentication, API endpoints, deterministic policy math, multi-tenancy data isolation, cross-tenant leak prevention, and automated email dispatching.
 
 To run the test suite:
 ```powershell
-pytest
+pytest -v
 ```
 To run the code linter:
 ```powershell
-ruff check app tests
+ruff check app/ tests/ scripts/
 ```
 Both commands pass cleanly with **0 errors**.

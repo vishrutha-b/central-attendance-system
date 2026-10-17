@@ -1,5 +1,5 @@
 """
-CLI script to create or verify the initial admin account in MongoDB.
+CLI script to create or verify the initial admin account in MongoDB with multi-tenancy.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from app.config import get_settings
 from app.database.connection import close_database_connection, connect_to_database, get_database
 from app.database.indexes import create_indexes
 from app.repositories.admin_repo import AdminRepository
+from app.repositories.tenant_repo import TenantRepository
 from app.security.password import hash_password
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -26,7 +27,10 @@ logger = logging.getLogger("create_admin")
 
 
 async def create_admin(
-    username: str | None = None, email: str | None = None, password: str | None = None
+    username: str | None = None,
+    email: str | None = None,
+    password: str | None = None,
+    tenant_id: str = "default",
 ) -> None:
     settings = get_settings()
     username = username or settings.initial_admin_username
@@ -37,19 +41,38 @@ async def create_admin(
     db = get_database()
     await create_indexes(db)
 
-    admin_repo = AdminRepository(db)
+    # Ensure tenant exists
+    tenant_repo = TenantRepository(db)
+    if tenant_id == "default":
+        await tenant_repo.ensure_default_tenant()
+    else:
+        existing_tenant = await tenant_repo.find_by_id(tenant_id)
+        if not existing_tenant:
+            await tenant_repo.create(
+                {
+                    "tenant_id": tenant_id,
+                    "name": f"{tenant_id.title()} Org",
+                    "contact_email": email,
+                    "status": "active",
+                    "settings": {},
+                }
+            )
+
+    admin_repo = AdminRepository(db, tenant_id=tenant_id)
 
     existing = await admin_repo.find_by_username(username)
     if existing:
         logger.info(
-            "Admin user '%s' already exists (admin_id=%s). No change made.",
+            "Admin user '%s' already exists for tenant '%s' (admin_id=%s). No change made.",
             username,
+            tenant_id,
             existing.get("admin_id"),
         )
         await close_database_connection()
         return
 
     admin_doc = {
+        "tenant_id": tenant_id,
         "admin_id": str(uuid.uuid4()),
         "username": username,
         "email": email,
@@ -60,7 +83,12 @@ async def create_admin(
     }
 
     await admin_repo.create(admin_doc)
-    logger.info("Admin user '%s' created successfully (email: %s).", username, email)
+    logger.info(
+        "Admin user '%s' created successfully for tenant '%s' (email: %s).",
+        username,
+        tenant_id,
+        email,
+    )
     await close_database_connection()
 
 
@@ -69,9 +97,10 @@ def main() -> None:
     parser.add_argument("--username", help="Admin username (default: from .env)")
     parser.add_argument("--email", help="Admin email (default: from .env)")
     parser.add_argument("--password", help="Admin password (default: from .env)")
+    parser.add_argument("--tenant-id", default="default", help="Tenant ID (default: 'default')")
     args = parser.parse_args()
 
-    asyncio.run(create_admin(args.username, args.email, args.password))
+    asyncio.run(create_admin(args.username, args.email, args.password, args.tenant_id))
 
 
 if __name__ == "__main__":

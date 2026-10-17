@@ -14,6 +14,7 @@ from app.services.leave_service import HolidayService, LeaveService
 from app.services.policy_service import (
     PolicyThresholds,
     calculate_overall_stats,
+    calculate_shift_metrics,
     evaluate_period,
 )
 
@@ -120,6 +121,29 @@ class ReportService:
                 settings.working_days_per_week,
             )
 
+            # Calculate shift metrics across period
+            total_late_mins = 0
+            total_early_mins = 0
+            total_ot_hours = 0.0
+
+            sessions_by_date: dict[str, list[dict[str, Any]]] = {}
+            for s in sessions:
+                d_str = s["date"].isoformat() if isinstance(s["date"], date) else str(s["date"])
+                sessions_by_date.setdefault(d_str, []).append(s)
+
+            for _d_str, day_sessions in sessions_by_date.items():
+                s_metrics = calculate_shift_metrics(
+                    day_sessions,
+                    shift_start_str=settings.shift_start_time,
+                    shift_end_str=settings.shift_end_time,
+                    late_grace_minutes=settings.late_grace_minutes,
+                    standard_shift_hours=settings.standard_shift_hours,
+                    company_tz_name=settings.company_timezone,
+                )
+                total_late_mins += s_metrics["late_minutes"]
+                total_early_mins += s_metrics["early_exit_minutes"]
+                total_ot_hours += s_metrics["overtime_hours"]
+
             employee_reports.append(
                 {
                     "employee_id": emp_id,
@@ -155,6 +179,9 @@ class ReportService:
                         for r in weekly_results
                     ],
                     "has_no_attendance": overall["has_no_attendance"],
+                    "total_late_minutes": total_late_mins,
+                    "total_early_exit_minutes": total_early_mins,
+                    "total_overtime_hours": round(total_ot_hours, 2),
                 }
             )
 

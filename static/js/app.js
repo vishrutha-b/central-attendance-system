@@ -93,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (viewId === 'leave') this.loadLeaveView();
       if (viewId === 'reports') this.loadReportsView();
       if (viewId === 'audit') this.loadAuditView();
+      if (viewId === 'tenants') this.loadTenantsView();
     },
 
     // ── System Health ───────────────────────────────────────────
@@ -214,6 +215,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Sign In Form Handler
       loginForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const tenantInput = document.getElementById('auth-input-tenant');
+        const tenantId = tenantInput?.value.trim() || 'default';
         const username = userInput?.value.trim() || '';
         const password = passInput?.value || '';
 
@@ -233,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (errorBox) errorBox.classList.remove('visible');
 
         try {
-          await window.camsApi.login(username, password);
+          await window.camsApi.login(username, password, tenantId);
           this.state.currentUser = window.camsApi.getCurrentUser();
 
           // Transition to Authenticated Shell
@@ -265,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Register Form Handler
       registerForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const tenantId = document.getElementById('auth-reg-tenant-id')?.value.trim() || 'default';
         const email = document.getElementById('auth-reg-email')?.value.trim();
         const password = document.getElementById('auth-reg-password')?.value;
         const confirmPassword = document.getElementById('auth-reg-confirm-password')?.value;
@@ -297,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const username = document.getElementById('auth-reg-admin-username')?.value.trim();
             const name = document.getElementById('auth-reg-admin-name')?.value.trim();
             if (!username) throw new Error('Please choose an admin username.');
-            await window.camsApi.registerAdmin({ username, email, password, name });
+            await window.camsApi.registerAdmin({ username, email, password, name, tenant_id: tenantId });
           } else {
             const empId = document.getElementById('auth-reg-emp-id')?.value.trim();
             const name = document.getElementById('auth-reg-emp-name')?.value.trim();
@@ -309,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
               email,
               department,
               password,
+              tenant_id: tenantId,
             });
           }
 
@@ -391,6 +396,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const navLeave = document.querySelector('[data-tab="leave"]');
       const navReports = document.querySelector('[data-tab="reports"]');
       const navAudit = document.querySelector('[data-tab="audit"]');
+      const navTenants = document.getElementById('nav-tab-tenants');
+
+      // Update active organization badge in navbar
+      const tenantPill = document.getElementById('nav-active-tenant-pill');
+      const tenantText = document.getElementById('nav-active-tenant-text');
+      const activeTenant = window.camsApi.getTenantId() || 'default';
+      if (tenantText) {
+        tenantText.textContent = `🏢 Org: ${activeTenant}`;
+      }
+      if (tenantPill) {
+        tenantPill.style.display = 'inline-flex';
+      }
 
       if (isEmployee) {
         if (navDashboard) navDashboard.textContent = 'My Punch Station';
@@ -401,9 +418,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Hide admin-only tabs
         if (navEmployees) navEmployees.style.display = 'none';
         if (navAudit) navAudit.style.display = 'none';
+        if (navTenants) navTenants.style.display = 'none';
 
         // If currently on an admin-only view, switch to dashboard
-        if (this.state.currentView === 'employees' || this.state.currentView === 'audit') {
+        if (this.state.currentView === 'employees' || this.state.currentView === 'audit' || this.state.currentView === 'tenants') {
           this.switchView('dashboard');
         }
       } else {
@@ -414,6 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (navEmployees) navEmployees.style.display = '';
         if (navAudit) navAudit.style.display = '';
+        if (navTenants) navTenants.style.display = '';
       }
 
       // 3. Dashboard Column & Banner Views
@@ -471,13 +490,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 5. Leave Request Form Controls
       const leaveEmpInput = document.getElementById('leave-emp-id');
+      const regReqEmpInput = document.getElementById('reg-req-emp-id');
       if (isEmployee) {
+        const empId = user.employee_id || user.username;
         if (leaveEmpInput) {
-          leaveEmpInput.value = user.employee_id || user.username;
+          leaveEmpInput.value = empId;
           leaveEmpInput.readOnly = true;
+        }
+        if (regReqEmpInput) {
+          regReqEmpInput.value = empId;
+          regReqEmpInput.readOnly = true;
         }
       } else {
         if (leaveEmpInput) leaveEmpInput.readOnly = false;
+        if (regReqEmpInput) regReqEmpInput.readOnly = false;
       }
     },
 
@@ -752,6 +778,108 @@ document.addEventListener('DOMContentLoaded', () => {
           this.showToast('error', err.message);
         }
       });
+
+      // 8. Self-Service Attendance Regularization Request
+      document.getElementById('regularization-request-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          employee_id: document.getElementById('reg-req-emp-id').value.trim(),
+          date: document.getElementById('reg-req-date').value,
+          requested_entry_time: document.getElementById('reg-req-entry').value.trim(),
+          requested_exit_time: document.getElementById('reg-req-exit').value.trim(),
+          reason: document.getElementById('reg-req-reason').value,
+          notes: document.getElementById('reg-req-notes').value.trim() || null,
+        };
+        try {
+          await window.camsApi.submitRegularization(payload);
+          this.closeModal('modal-employee-regularize');
+          document.getElementById('regularization-request-form').reset();
+          this.showToast('success', 'Regularization request submitted for review.');
+          await this.loadRegularizations();
+        } catch (err) {
+          this.showToast('error', `Submission error: ${err.message}`);
+        }
+      });
+
+      // 9. Leave Quota Allocation (HR / Admin)
+      document.getElementById('allocate-leave-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          employee_id: document.getElementById('alloc-emp-id').value.trim(),
+          year: parseInt(document.getElementById('alloc-year').value, 10),
+          leave_type: document.getElementById('alloc-type').value,
+          allocated_days: parseFloat(document.getElementById('alloc-days').value),
+        };
+        try {
+          await window.camsApi.allocateLeaveBalance(payload);
+          this.closeModal('modal-allocate-leave');
+          document.getElementById('allocate-leave-form').reset();
+          this.showToast('success', `Updated ${payload.leave_type} quota for ${payload.employee_id}`);
+          await this.loadLeaveView();
+        } catch (err) {
+          this.showToast('error', `Allocation error: ${err.message}`);
+        }
+      });
+
+      // 10. Tenant Organization Controls & Form (Admin only)
+      document.getElementById('btn-open-onboard-tenant')?.addEventListener('click', () => {
+        this.openModal('modal-onboard-tenant');
+      });
+
+      document.getElementById('btn-refresh-tenants')?.addEventListener('click', () => {
+        this.loadTenantsView();
+      });
+
+      document.getElementById('onboard-tenant-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('btn-submit-onboard-tenant');
+        const prevText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Provisioning...';
+        }
+
+        try {
+          const tenantId = document.getElementById('tenant-id-input').value.trim();
+          const name = document.getElementById('tenant-name-input').value.trim();
+          const contactEmail = document.getElementById('tenant-email-input').value.trim();
+          const adminUsername = document.getElementById('tenant-admin-user')?.value.trim() || null;
+          const adminPassword = document.getElementById('tenant-admin-pwd')?.value || null;
+          const timezone = document.getElementById('tenant-tz')?.value.trim() || 'Asia/Kolkata';
+          const minDays = parseInt(document.getElementById('tenant-min-days')?.value || '3', 10);
+          const minHours = parseFloat(document.getElementById('tenant-min-hours')?.value || '15.0');
+          const minAvg = parseFloat(document.getElementById('tenant-min-avg')?.value || '5.0');
+
+          const payload = {
+            tenant_id: tenantId,
+            name,
+            contact_email: contactEmail,
+            admin_username: adminUsername || undefined,
+            admin_password: adminPassword || undefined,
+            settings: {
+              company_timezone: timezone,
+              timezone,
+              min_days_per_week: minDays,
+              min_hours_per_week: minHours,
+              min_avg_hours_per_day: minAvg,
+              daily_min_average_hours: minAvg,
+            },
+          };
+
+          const res = await window.camsApi.onboardTenant(payload);
+          this.closeModal('modal-onboard-tenant');
+          document.getElementById('onboard-tenant-form').reset();
+          this.showToast('success', `Organization "${res.name}" (${res.tenant_id}) provisioned successfully!`);
+          await this.loadTenantsView();
+        } catch (err) {
+          this.showToast('error', `Failed to onboard organization: ${err.message}`);
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = prevText;
+          }
+        }
+      });
     },
 
     async handlePunchSubmit() {
@@ -902,8 +1030,71 @@ document.addEventListener('DOMContentLoaded', () => {
         if (leaveCountEl) leaveCountEl.textContent = pendingCount;
 
         this.renderRoster();
+        await this.loadLivePresence();
       } catch (err) {
         console.warn('Sync note:', err.message);
+      }
+    },
+
+    async loadLivePresence() {
+      const tbody = document.getElementById('presence-table-body');
+      if (!tbody) return;
+
+      const dept = document.getElementById('presence-dept-filter')?.value || null;
+      try {
+        const res = await window.camsApi.getLivePresence(dept);
+        
+        // Update pills
+        const inOfficeEl = document.getElementById('presence-count-in-office');
+        const onBreakEl = document.getElementById('presence-count-on-break');
+        const onLeaveEl = document.getElementById('presence-count-on-leave');
+        const absentEl = document.getElementById('presence-count-absent');
+        if (inOfficeEl) inOfficeEl.textContent = res.in_office_count || 0;
+        if (onBreakEl) onBreakEl.textContent = res.on_break_count || 0;
+        if (onLeaveEl) onLeaveEl.textContent = res.on_leave_count || 0;
+        if (absentEl) absentEl.textContent = res.absent_count || 0;
+
+        const emps = res.employees || [];
+        if (!emps.length) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No employees registered.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = emps.map((e) => {
+          let badgeHtml = '';
+          if (e.presence_status === 'in_office') {
+            badgeHtml = `<span class="presence-stat-pill in-office" style="font-size:0.75rem; padding:3px 10px;"><span class="status-dot-pulse green"></span> In Office</span>`;
+          } else if (e.presence_status === 'on_break') {
+            badgeHtml = `<span class="presence-stat-pill on-break" style="font-size:0.75rem; padding:3px 10px;"><span class="status-dot-pulse amber"></span> On Break</span>`;
+          } else if (e.presence_status === 'on_leave') {
+            badgeHtml = `<span class="presence-stat-pill on-leave" style="font-size:0.75rem; padding:3px 10px;"><span class="status-dot-pulse blue"></span> On Leave</span>`;
+          } else {
+            badgeHtml = `<span class="presence-stat-pill absent" style="font-size:0.75rem; padding:3px 10px;"><span class="status-dot-pulse gray"></span> Absent / Pending</span>`;
+          }
+
+          const hoursStr = e.accumulated_hours > 0 ? `<strong>${e.accumulated_hours.toFixed(2)}h</strong>` : `<span style="color:var(--text-muted);">0.00h</span>`;
+
+          return `
+            <tr>
+              <td>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div class="avatar" style="width:28px; height:28px; font-size:0.75rem;">${e.name ? e.name.slice(0, 2).toUpperCase() : 'EM'}</div>
+                  <div>
+                    <strong style="font-size:0.86rem;">${e.name}</strong>
+                    <div style="font-size:0.72rem; color:var(--text-muted);"><code>${e.employee_id}</code></div>
+                  </div>
+                </div>
+              </td>
+              <td><span style="font-size:0.82rem; color:var(--text-muted);">${e.department}</span></td>
+              <td>${badgeHtml}</td>
+              <td style="font-size:0.82rem;">${e.first_entry || '—'}</td>
+              <td style="font-size:0.82rem;">${e.last_exit || '—'}</td>
+              <td style="font-size:0.84rem;">${hoursStr}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--danger); padding:1rem;">Failed to load live presence: ${err.message}</td></tr>`;
       }
     },
 
@@ -982,7 +1173,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const hours = item.total_hours ? `${item.total_hours.toFixed(2)}h` : '0.00h';
           const isCompliant = item.total_hours >= 5.0;
 
-          // Edit action: Only Admin can edit. For Employees, show "Locked / Final"
+          const otBadge = (item.total_hours && item.total_hours > 8.0)
+            ? `<span class="badge-ot" style="margin-left:4px;">OT: +${(item.total_hours - 8.0).toFixed(1)}h</span>`
+            : '';
+
+          // Edit action: Only Admin can edit. For Employees, show "Permanent"
           const actionHtml = isEmployee
             ? `<span style="font-size:0.75rem; color:var(--text-muted);">Permanent</span>`
             : `<button class="btn btn-secondary btn-sm" onclick="app.openRegularizeModal('${item.attendance_id}', '${item.employee_id}', '${entryStr}', '${exitStr}')">Edit</button>`;
@@ -999,13 +1194,101 @@ document.addEventListener('DOMContentLoaded', () => {
                   ${item.attendance_status}
                 </span>
                 ${item.exit_time && !isCompliant ? '<span class="badge badge-danger" style="margin-left:4px;">Deficit</span>' : ''}
+                ${otBadge}
               </td>
               <td>${actionHtml}</td>
             </tr>
           `;
         }).join('');
+
+        await this.loadRegularizations();
       } catch (err) {
         tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--danger); padding:2rem;">${err.message}</td></tr>`;
+      }
+    },
+
+    async loadRegularizations() {
+      const tbody = document.getElementById('regularization-table-body');
+      if (!tbody) return;
+
+      const user = window.camsApi.getCurrentUser();
+      const isEmployee = user && user.role === 'employee';
+      const params = { page: 1, page_size: 50 };
+      if (isEmployee) {
+        params.employee_id = user.employee_id || user.username;
+      }
+
+      try {
+        const res = await window.camsApi.listRegularizations(params);
+        const items = res.items || [];
+
+        if (!items.length) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No regularization requests found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = items.map((r) => {
+          const entryTimeStr = r.requested_entry_time ? new Date(r.requested_entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+          const exitTimeStr = r.requested_exit_time ? new Date(r.requested_exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+          let statusBadge = '';
+          if (r.status === 'approved') {
+            statusBadge = `<span class="badge badge-success">Approved</span>`;
+          } else if (r.status === 'rejected') {
+            statusBadge = `<span class="badge badge-danger">Rejected</span>`;
+          } else {
+            statusBadge = `<span class="badge badge-warning">Pending Review</span>`;
+          }
+
+          let actionHtml = '';
+          if (!isEmployee && r.status === 'pending') {
+            actionHtml = `
+              <button class="btn btn-secondary btn-sm" onclick="app.approveRegularization('${r.request_id}')">Approve</button>
+              <button class="btn btn-secondary btn-sm" onclick="app.rejectRegularization('${r.request_id}')" style="color:var(--danger); margin-left:4px;">Reject</button>
+            `;
+          } else {
+            actionHtml = `<span style="font-size:0.75rem; color:var(--text-muted);">${r.reviewer_notes || r.status}</span>`;
+          }
+
+          return `
+            <tr>
+              <td><code>${r.request_id}</code></td>
+              <td><strong>${r.employee_id}</strong></td>
+              <td>${r.date}</td>
+              <td>${entryTimeStr} → ${exitTimeStr}</td>
+              <td style="font-size:0.8rem; text-transform:capitalize;">${(r.reason || '').replace(/_/g, ' ')}</td>
+              <td>${statusBadge}</td>
+              <td>${actionHtml}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--danger); padding:1rem;">${err.message}</td></tr>`;
+      }
+    },
+
+    async approveRegularization(requestId) {
+      const note = prompt('Optional approval notes:', 'Approved by HR');
+      if (note === null) return;
+      try {
+        await window.camsApi.reviewRegularization(requestId, 'approved', note);
+        this.showToast('success', 'Regularization approved and timesheet updated.');
+        await this.loadRegularizations();
+        await this.loadAttendanceView();
+      } catch (err) {
+        this.showToast('error', err.message);
+      }
+    },
+
+    async rejectRegularization(requestId) {
+      const note = prompt('Reason for rejection:');
+      if (!note) return;
+      try {
+        await window.camsApi.reviewRegularization(requestId, 'rejected', note);
+        this.showToast('warning', 'Regularization rejected.');
+        await this.loadRegularizations();
+      } catch (err) {
+        this.showToast('error', err.message);
       }
     },
 
@@ -1108,6 +1391,37 @@ document.addEventListener('DOMContentLoaded', () => {
       // Hide Add Holiday button if employee
       const addHolidayBtn = document.querySelector('[data-open-modal="modal-holiday"]');
       if (addHolidayBtn) addHolidayBtn.style.display = isEmployee ? 'none' : '';
+
+      // Adjust Quota button: show for Admin, hide for employee
+      const adjustQuotaBtn = document.getElementById('btn-adjust-quota');
+      if (adjustQuotaBtn) adjustQuotaBtn.style.display = isEmployee ? 'none' : 'inline-block';
+
+      // Load Quota Balances for employee
+      const targetEmpId = isEmployee ? (user.employee_id || user.username) : 'EMP-007';
+      try {
+        if (targetEmpId) {
+          const currentYear = new Date().getFullYear();
+          const balanceRes = await window.camsApi.getLeaveBalances(targetEmpId, currentYear);
+          if (balanceRes && balanceRes.balances) {
+            const b = balanceRes.balances;
+            const setCard = (key, valId, subId) => {
+              const item = b[key];
+              const valEl = document.getElementById(valId);
+              const subEl = document.getElementById(subId);
+              if (item && valEl) {
+                valEl.textContent = `${item.remaining}d`;
+                if (subEl) subEl.textContent = `${item.used} used of ${item.allocated}d total (${targetEmpId})`;
+              }
+            };
+            setCard('annual', 'quota-val-annual', 'quota-sub-annual');
+            setCard('casual', 'quota-val-casual', 'quota-sub-casual');
+            setCard('sick', 'quota-val-sick', 'quota-sub-sick');
+            setCard('other', 'quota-val-other', 'quota-sub-other');
+          }
+        }
+      } catch (balErr) {
+        console.warn('Leave quota sync note:', balErr.message);
+      }
 
       if (tableBody) {
         tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:1.5rem;"><div class="spinner"></div></td></tr>`;
@@ -1295,6 +1609,65 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
       } catch (err) {
         tableBody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); text-align:center;">Admin sign-in required: ${err.message}</td></tr>`;
+      }
+    },
+
+    // ── Tenant Organizations View (Admin only) ──────────────────
+    async loadTenantsView() {
+      const tableBody = document.getElementById('tenants-table-body');
+      if (!tableBody) return;
+
+      const user = window.camsApi.getCurrentUser();
+      if (user && user.role === 'employee') {
+        tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">Access restricted to administrators.</td></tr>`;
+        return;
+      }
+
+      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem;"><div class="spinner"></div></td></tr>`;
+
+      try {
+        const res = await window.camsApi.getTenants(0, 50);
+        const items = Array.isArray(res) ? res : (res.items || []);
+
+        if (!items.length) {
+          tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">No tenant organizations found.</td></tr>`;
+          return;
+        }
+
+        const currentTenant = window.camsApi.getTenantId();
+
+        tableBody.innerHTML = items.map((t) => {
+          const isCurrent = t.tenant_id === currentTenant;
+          const settings = t.settings || {};
+          const minDays = settings.min_days_per_week ?? 3;
+          const minHours = settings.min_hours_per_week ?? 15;
+          const minAvg = settings.min_avg_hours_per_day ?? settings.daily_min_average_hours ?? 5;
+          const tz = settings.company_timezone || settings.timezone || 'Asia/Kolkata';
+          const thresholds = `${minDays}d / ${minHours}h / ${minAvg}h avg`;
+          const createdDate = t.created_at ? new Date(t.created_at).toLocaleDateString() : 'N/A';
+          const isActive = t.status ? t.status === 'active' : (t.is_active ?? true);
+
+          return `
+            <tr>
+              <td>
+                <code><strong>${t.tenant_id}</strong></code>
+                ${isCurrent ? '<span class="badge badge-success" style="margin-left: 6px; font-size: 0.7rem;">Current Active</span>' : ''}
+              </td>
+              <td><strong>${t.name}</strong></td>
+              <td>${t.contact_email || '—'}</td>
+              <td>
+                <span class="badge ${isActive ? 'badge-success' : 'badge-danger'}">
+                  ${isActive ? 'Active' : 'Inactive'}
+                </span>
+              </td>
+              <td><code>${tz}</code></td>
+              <td><small>${thresholds}</small></td>
+              <td><small>${createdDate}</small></td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tableBody.innerHTML = `<tr><td colspan="7" style="color:var(--danger); text-align:center;">Failed to load organizations: ${err.message}</td></tr>`;
       }
     },
   };

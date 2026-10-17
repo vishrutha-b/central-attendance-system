@@ -1,7 +1,9 @@
 """
-Idempotent database seeder for CAMS.
+Idempotent database seeder for CAMS with multi-tenancy support.
 
 Populates:
+- Default organization tenant
+- Administrator account
 - Employees across multiple departments
 - Company holidays
 - Leave requests
@@ -28,12 +30,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import get_settings
 from app.database.connection import close_database_connection, connect_to_database, get_database
 from app.database.indexes import create_indexes
+from app.repositories.tenant_repo import TenantRepository
 from app.security.password import hash_password
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("seed_data")
 
 TZ_KOLKATA = ZoneInfo("Asia/Kolkata")
+DEFAULT_TENANT = "default"
 
 
 async def seed() -> None:
@@ -42,8 +46,15 @@ async def seed() -> None:
     db = get_database()
     await create_indexes(db)
 
+    # 1. Seed Default Tenant
+    logger.info("Seeding default organization tenant...")
+    tenant_repo = TenantRepository(db)
+    await tenant_repo.ensure_default_tenant()
+
+    # 2. Seed Admin
     logger.info("Seeding initial administrator...")
     admin_doc = {
+        "tenant_id": DEFAULT_TENANT,
         "admin_id": "ADM-000001",
         "username": settings.initial_admin_username,
         "email": settings.initial_admin_email,
@@ -53,14 +64,16 @@ async def seed() -> None:
         "created_at": datetime.now(UTC),
     }
     await db.admin_users.update_one(
-        {"username": admin_doc["username"]},
+        {"tenant_id": DEFAULT_TENANT, "username": admin_doc["username"]},
         {"$set": admin_doc},
         upsert=True,
     )
 
+    # 3. Seed Employees
     logger.info("Seeding employees...")
     employees = [
         {
+            "tenant_id": DEFAULT_TENANT,
             "employee_id": "EMP-001",
             "name": "Aarav Sharma",
             "email": "aarav.sharma@company.com",
@@ -72,6 +85,7 @@ async def seed() -> None:
             "updated_at": datetime.now(UTC),
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "employee_id": "EMP-002",
             "name": "Diya Patel",
             "email": "diya.patel@company.com",
@@ -83,6 +97,7 @@ async def seed() -> None:
             "updated_at": datetime.now(UTC),
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "employee_id": "EMP-003",
             "name": "Rohan Verma",
             "email": "rohan.verma@company.com",
@@ -94,6 +109,7 @@ async def seed() -> None:
             "updated_at": datetime.now(UTC),
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "employee_id": "EMP-004",
             "name": "Priya Nair",
             "email": "priya.nair@company.com",
@@ -105,6 +121,7 @@ async def seed() -> None:
             "updated_at": datetime.now(UTC),
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "employee_id": "EMP-005",
             "name": "Vikram Singh",
             "email": "vikram.singh@company.com",
@@ -116,6 +133,7 @@ async def seed() -> None:
             "updated_at": datetime.now(UTC),
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "employee_id": "EMP-006",
             "name": "Ananya Roy",
             "email": "ananya.roy@company.com",
@@ -130,39 +148,45 @@ async def seed() -> None:
 
     for emp in employees:
         await db.employees.update_one(
-            {"employee_id": emp["employee_id"]},
+            {"tenant_id": DEFAULT_TENANT, "employee_id": emp["employee_id"]},
             {"$set": emp},
             upsert=True,
         )
 
+    # 4. Seed Holidays
     logger.info("Seeding company holidays...")
     current_year = date.today().year
     holidays = [
         {
+            "tenant_id": DEFAULT_TENANT,
             "holiday_id": f"HOL-{current_year}-01",
             "name": "New Year's Day",
             "date": f"{current_year}-01-01",
             "description": "National holiday",
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "holiday_id": f"HOL-{current_year}-02",
             "name": "Republic Day",
             "date": f"{current_year}-01-26",
             "description": "National holiday",
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "holiday_id": f"HOL-{current_year}-03",
             "name": "Independence Day",
             "date": f"{current_year}-08-15",
             "description": "National holiday",
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "holiday_id": f"HOL-{current_year}-04",
             "name": "Gandhi Jayanti",
             "date": f"{current_year}-10-02",
             "description": "National holiday",
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "holiday_id": f"HOL-{current_year}-05",
             "name": "Christmas",
             "date": f"{current_year}-12-25",
@@ -171,23 +195,22 @@ async def seed() -> None:
     ]
     for hol in holidays:
         await db.holidays.update_one(
-            {"holiday_id": hol["holiday_id"]},
+            {"tenant_id": DEFAULT_TENANT, "holiday_id": hol["holiday_id"]},
             {"$set": hol},
             upsert=True,
         )
 
+    # 5. Seed Leave Requests
     logger.info("Seeding leave requests...")
-    # Seed sample leaves for EMP-004 and EMP-005
     today = date.today()
     last_week_start = today - timedelta(days=today.weekday() + 7)  # Previous Monday
     leaves = [
         {
+            "tenant_id": DEFAULT_TENANT,
             "leave_id": "LV-001",
             "employee_id": "EMP-004",
-            "start_date": (
-                last_week_start + timedelta(days=3)
-            ).isoformat(),  # Thursday of last week
-            "end_date": (last_week_start + timedelta(days=4)).isoformat(),  # Friday of last week
+            "start_date": (last_week_start + timedelta(days=3)).isoformat(),
+            "end_date": (last_week_start + timedelta(days=4)).isoformat(),
             "reason": "Family function",
             "status": "approved",
             "reviewed_by": "ADM-000001",
@@ -196,6 +219,7 @@ async def seed() -> None:
             "updated_at": datetime.now(UTC),
         },
         {
+            "tenant_id": DEFAULT_TENANT,
             "leave_id": "LV-002",
             "employee_id": "EMP-005",
             "start_date": (today + timedelta(days=7)).isoformat(),
@@ -210,49 +234,43 @@ async def seed() -> None:
     ]
     for lv in leaves:
         await db.leave_requests.update_one(
-            {"leave_id": lv["leave_id"]},
+            {"tenant_id": DEFAULT_TENANT, "leave_id": lv["leave_id"]},
             {"$set": lv},
             upsert=True,
         )
 
+    # 6. Seed Attendance Sessions
     logger.info("Seeding attendance sessions...")
-    # Generate past completed week sessions
-    # Monday to Friday for last week:
-    # EMP-001: 5 full days (8 hrs/day) -> Fully compliant
-    # EMP-002: 3 days (6 hrs/day = 18 hrs) -> Compliant
-    # EMP-003: 2 days (4 hrs/day = 8 hrs) -> Non-compliant (< 3 days, < 15 hrs)
-    # EMP-004: Multi-sessions on Mon, Tue, Wed (2x4h) + approved leave Thu/Fri
-    #          -> Compliant with leave adjustment
-    # EMP-005: 1 incomplete session on Wednesday
     sessions = []
 
-    # EMP-001: Mon to Fri, 09:00 to 17:30 (8.5 hrs each day)
+    # EMP-001: 5 full days (8 hrs/day = 40 hrs total) - Compliant
     for d in range(5):
         s_date = last_week_start + timedelta(days=d)
-        entry_dt = datetime.combine(s_date, time(9, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
+        entry_dt = datetime.combine(s_date, time(9, 30), tzinfo=TZ_KOLKATA).astimezone(UTC)
         exit_dt = datetime.combine(s_date, time(17, 30), tzinfo=TZ_KOLKATA).astimezone(UTC)
-        total_hours = 8.5
         sessions.append(
             {
+                "tenant_id": DEFAULT_TENANT,
                 "attendance_id": f"ATT-SEED-001-{d}",
                 "employee_id": "EMP-001",
                 "date": s_date.isoformat(),
                 "entry_time": entry_dt,
                 "exit_time": exit_dt,
-                "total_hours": total_hours,
+                "total_hours": 8.0,
                 "attendance_status": "present",
                 "created_at": datetime.now(UTC),
                 "updated_at": datetime.now(UTC),
             }
         )
 
-    # EMP-002: Mon, Tue, Wed (09:30 to 15:30 -> 6.0 hrs each = 18 hrs total)
-    for d in range(3):
+    # EMP-002: 3 days (6 hrs/day = 18 hrs total) - Compliant
+    for d in [0, 2, 4]:
         s_date = last_week_start + timedelta(days=d)
-        entry_dt = datetime.combine(s_date, time(9, 30), tzinfo=TZ_KOLKATA).astimezone(UTC)
-        exit_dt = datetime.combine(s_date, time(15, 30), tzinfo=TZ_KOLKATA).astimezone(UTC)
+        entry_dt = datetime.combine(s_date, time(10, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
+        exit_dt = datetime.combine(s_date, time(16, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
         sessions.append(
             {
+                "tenant_id": DEFAULT_TENANT,
                 "attendance_id": f"ATT-SEED-002-{d}",
                 "employee_id": "EMP-002",
                 "date": s_date.isoformat(),
@@ -265,26 +283,27 @@ async def seed() -> None:
             }
         )
 
-    # EMP-003: Mon, Tue only (10:00 to 14:00 -> 4.0 hrs each = 8 hrs total) -> Non-compliant
-    for d in range(2):
+    # EMP-003: 2 days (7 hrs/day = 14 hrs total) - Non-compliant (< 3 days, < 15 hrs)
+    for d in [1, 3]:
         s_date = last_week_start + timedelta(days=d)
-        entry_dt = datetime.combine(s_date, time(10, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
-        exit_dt = datetime.combine(s_date, time(14, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
+        entry_dt = datetime.combine(s_date, time(9, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
+        exit_dt = datetime.combine(s_date, time(16, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
         sessions.append(
             {
+                "tenant_id": DEFAULT_TENANT,
                 "attendance_id": f"ATT-SEED-003-{d}",
                 "employee_id": "EMP-003",
                 "date": s_date.isoformat(),
                 "entry_time": entry_dt,
                 "exit_time": exit_dt,
-                "total_hours": 4.0,
+                "total_hours": 7.0,
                 "attendance_status": "present",
                 "created_at": datetime.now(UTC),
                 "updated_at": datetime.now(UTC),
             }
         )
 
-    # EMP-004: Mon, Tue, Wed multi-sessions (09:00 - 13:00 and 14:00 - 18:00)
+    # EMP-004: Multi-session days (Mon-Wed)
     for d in range(3):
         s_date = last_week_start + timedelta(days=d)
         # Session 1
@@ -292,6 +311,7 @@ async def seed() -> None:
         x1 = datetime.combine(s_date, time(13, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
         sessions.append(
             {
+                "tenant_id": DEFAULT_TENANT,
                 "attendance_id": f"ATT-SEED-004-{d}-1",
                 "employee_id": "EMP-004",
                 "date": s_date.isoformat(),
@@ -308,6 +328,7 @@ async def seed() -> None:
         x2 = datetime.combine(s_date, time(18, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
         sessions.append(
             {
+                "tenant_id": DEFAULT_TENANT,
                 "attendance_id": f"ATT-SEED-004-{d}-2",
                 "employee_id": "EMP-004",
                 "date": s_date.isoformat(),
@@ -326,6 +347,7 @@ async def seed() -> None:
     xm = datetime.combine(m_date, time(17, 0), tzinfo=TZ_KOLKATA).astimezone(UTC)
     sessions.append(
         {
+            "tenant_id": DEFAULT_TENANT,
             "attendance_id": "ATT-SEED-005-1",
             "employee_id": "EMP-005",
             "date": m_date.isoformat(),
@@ -342,6 +364,7 @@ async def seed() -> None:
     et = datetime.combine(t_date, time(9, 15), tzinfo=TZ_KOLKATA).astimezone(UTC)
     sessions.append(
         {
+            "tenant_id": DEFAULT_TENANT,
             "attendance_id": "ATT-SEED-005-2",
             "employee_id": "EMP-005",
             "date": t_date.isoformat(),
@@ -356,7 +379,7 @@ async def seed() -> None:
 
     for s in sessions:
         await db.attendance.update_one(
-            {"attendance_id": s["attendance_id"]},
+            {"tenant_id": DEFAULT_TENANT, "attendance_id": s["attendance_id"]},
             {"$set": s},
             upsert=True,
         )
