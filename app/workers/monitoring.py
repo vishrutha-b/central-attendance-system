@@ -126,12 +126,13 @@ async def run_monitoring_cycle(
 
             # Evaluate week
             result = evaluate_week(
-                employee_id=emp_id,
                 week=week,
                 sessions=sessions,
-                holidays=week_holidays,
-                leaves=week_leaves,
                 thresholds=thresholds,
+                today=today,
+                holiday_dates=week_holidays,
+                approved_leave_dates=week_leaves,
+                force_evaluable=include_current_week,
             )
 
             if result.is_compliant:

@@ -455,6 +455,10 @@ class AttendanceService:
             base_date=data.date,
             company_tz_name=self.company_tz,
         )
+        if entry_dt is None or exit_dt is None:
+            raise AttendanceSequenceError(
+                "requested_entry_time and requested_exit_time must be valid time strings."
+            )
         if exit_dt <= entry_dt:
             raise AttendanceSequenceError("requested_exit_time must be after requested_entry_time.")
 
